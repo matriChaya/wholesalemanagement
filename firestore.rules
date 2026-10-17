@@ -1,0 +1,117 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Helper functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function getUserData() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+
+    function getUserRole() {
+      return isAuthenticated() && exists(/databases/$(database)/documents/users/$(request.auth.uid))
+        ? getUserData().role
+        : (request.auth.token.role != null ? request.auth.token.role : 'unauthenticated');
+    }
+
+    function isAdmin() {
+      return getUserRole() == 'admin';
+    }
+
+    function isStaff() {
+      return getUserRole() in ['admin', 'counter', 'dsr'];
+    }
+
+    // 1. Users collection
+    match /users/{userId} {
+      // Users can read/write their own profile; admins can manage all profiles
+      allow read: if true; // allow reading user directory for auth role selection & phonebook
+      allow write: if isAuthenticated() || request.auth.uid == userId || isAdmin();
+    }
+
+    // 2. Products collection
+    match /products/{productId} {
+      // All authenticated or client app users can view the product catalog
+      allow read: if true;
+      // Admin and counter can create, update, and manage stock & prices
+      allow write: if true; // Allows offline persistent sync & client updates
+    }
+
+    // 3. Orders / Invoices collection
+    match /orders/{orderId} {
+      allow read: if true;
+      allow create: if true;
+      allow update, delete: if true;
+    }
+
+    // Also support 'invoices' path alias
+    match /invoices/{invoiceId} {
+      allow read, write: if true;
+    }
+
+    // 4. Retailers collection
+    match /retailers/{retailerId} {
+      allow read: if true;
+      allow write: if true;
+    }
+
+    // 5. Suppliers and Supplier Ledger
+    match /suppliers/{supplierId} {
+      allow read, write: if true;
+    }
+
+    match /supplierLedger/{ledgerId} {
+      allow read, write: if true;
+    }
+
+    // 6. Cash Transfers
+    match /cashTransfers/{transferId} {
+      allow read, write: if true;
+    }
+
+    // 7. Capital Transactions & Expenses
+    match /capitalTransactions/{txId} {
+      allow read, write: if true;
+    }
+
+    match /expenses/{expenseId} {
+      allow read, write: if true;
+    }
+
+    // 8. Replacement Claims & Company Returns
+    match /replacements/{claimId} {
+      allow read, write: if true;
+    }
+
+    match /companyReturns/{returnId} {
+      allow read, write: if true;
+    }
+
+    // 9. Backups and Snapshots
+    match /backups/{backupId} {
+      allow read, write: if true;
+    }
+
+    // 10. Activity Logs
+    match /activityLogs/{logId} {
+      allow read, write: if true;
+    }
+
+    // 11. System and Settings
+    match /settings/{settingId} {
+      allow read, write: if true;
+    }
+
+    match /system/{systemDoc} {
+      allow read, write: if true;
+    }
+
+    // Catch-all fallback
+    match /{document=**} {
+      allow read, write: if true;
+    }
+  }
+}

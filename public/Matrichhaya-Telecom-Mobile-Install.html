@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+  <meta charset="UTF-8">
+  <title>মাতৃছায়া টেলিকম - মোবাইল অ্যাপ ইনস্টলার (Mobile App Installer)</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="theme-color" content="#059669">
+  <link rel="icon" type="image/svg+xml" href="/icon.svg">
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background-color: #020617;
+      color: #f8fafc;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Hind Siliguri", sans-serif;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+    .card {
+      background: #0f172a;
+      border: 1px solid #1e293b;
+      border-radius: 28px;
+      max-width: 480px;
+      width: 100%;
+      padding: 32px 24px;
+      text-align: center;
+      box-shadow: 0 25px 60px -15px rgba(0, 0, 0, 0.9);
+    }
+    .logo-badge {
+      width: 88px;
+      height: 88px;
+      border-radius: 26px;
+      background: linear-gradient(135deg, #10b981 0%, #047857 100%);
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 44px;
+      margin-bottom: 20px;
+      box-shadow: 0 16px 32px -8px rgba(16, 185, 129, 0.5);
+    }
+    h1 {
+      font-size: 24px;
+      font-weight: 800;
+      color: #ffffff;
+      margin-bottom: 8px;
+    }
+    .subtitle {
+      color: #34d399;
+      font-size: 14px;
+      font-weight: 600;
+      margin-bottom: 16px;
+    }
+    p {
+      color: #94a3b8;
+      font-size: 13px;
+      line-height: 1.6;
+      margin-bottom: 24px;
+    }
+    .btn {
+      display: block;
+      width: 100%;
+      background: linear-gradient(135deg, #059669, #10b981);
+      color: #ffffff;
+      font-weight: 700;
+      font-size: 16px;
+      padding: 16px 20px;
+      border-radius: 18px;
+      text-decoration: none;
+      box-shadow: 0 10px 25px -5px rgba(5, 150, 105, 0.6);
+      transition: transform 0.15s, opacity 0.15s;
+      margin-bottom: 20px;
+      cursor: pointer;
+      border: none;
+    }
+    .btn:active {
+      transform: scale(0.98);
+    }
+    .steps {
+      text-align: left;
+      background: #020617;
+      border: 1px solid #1e293b;
+      border-radius: 20px;
+      padding: 18px;
+      margin-top: 10px;
+      font-size: 13px;
+    }
+    .steps h3 {
+      font-size: 14px;
+      color: #e2e8f0;
+      margin-bottom: 12px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .step-item {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 12px;
+      color: #94a3b8;
+      line-height: 1.5;
+    }
+    .step-item:last-child { margin-bottom: 0; }
+    .step-num {
+      width: 22px;
+      height: 22px;
+      border-radius: 50%;
+      background: rgba(16, 185, 129, 0.2);
+      color: #34d399;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 11px;
+      font-weight: bold;
+      flex-shrink: 0;
+      margin-top: 1px;
+    }
+    .url-box {
+      margin-top: 16px;
+      background: #020617;
+      border: 1px dashed #334155;
+      padding: 10px 14px;
+      border-radius: 12px;
+      font-family: monospace;
+      font-size: 11px;
+      color: #38bdf8;
+      word-break: break-all;
+    }
+  </style>
+  <script>
+    const targetUrl = window.location.origin ? window.location.origin : "https://ais-pre-3wgi4u4u3ifdnk7qypox2b-897026234874.asia-southeast1.run.app";
+    function openApp() {
+      window.location.href = targetUrl;
+    }
+  </script>
+</head>
+<body>
+  <div class="card">
+    <div class="logo-badge">📱</div>
+    <h1>মাতৃছায়া টেলিকম</h1>
+    <div class="subtitle">পাইকারি ব্যবসা ও ডিস্ট্রিবিউশন ইআরপি</div>
+    <p>আপনার মোবাইল ডিভাইসে সরাসরি অ্যাপ ইনস্টল করুন অথবা ব্রাউজারে ফুলস্ক্রিনে চালু করুন।</p>
+    
+    <button onclick="openApp()" class="btn">🚀 অ্যাপ ওপেন / ইনস্টল করুন</button>
+
+    <div class="steps">
+      <h3>📲 মোবাইলে ১ ক্লিকে ইনস্টল করার নিয়ম:</h3>
+      <div class="step-item">
+        <div class="step-num">১</div>
+        <div>উপরে <strong>"অ্যাপ ওপেন করুন"</strong> বাটনে ক্লিক করে Google Chrome এ লিংকটি খুলুন।</div>
+      </div>
+      <div class="step-item">
+        <div class="step-num">২</div>
+        <div>ক্রোম ব্রাউজারের একদম উপরে ডান কোণায় <strong>৩-ডট মেন্যু (⋮)</strong> চাপুন।</div>
+      </div>
+      <div class="step-item">
+        <div class="step-num">৩</div>
+        <div>মেন্যু থেকে <strong>"Install app"</strong> অথবা <strong>"Add to Home screen"</strong> চাপুন।</div>
+      </div>
+      <div class="step-item">
+        <div class="step-num">৪</div>
+        <div>সঙ্গে সঙ্গে ফোনের স্ক্রিনে আসল অ্যান্ড্রয়েড অ্যাপের মতো আইকন যুক্ত হয়ে যাবে এবং সম্পূর্ণ অফলাইনে কাজ করবে!</div>
+      </div>
+    </div>
+
+    <div class="url-box" id="appUrlText">
+      https://ais-pre-3wgi4u4u3ifdnk7qypox2b-897026234874.asia-southeast1.run.app
+    </div>
+  </div>
+  <script>
+    if (window.location.origin) {
+      document.getElementById('appUrlText').innerText = window.location.origin;
+    }
+  </script>
+</body>
+</html>

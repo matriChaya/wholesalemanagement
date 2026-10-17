@@ -1,0 +1,14 @@
+[
+  {
+    "id": "matrichaya_cloud_export",
+    "timestamp": "2026-10-10T15:27:04.484Z",
+    "version": "2.6.0",
+    "createdBy": "usr_admin_01",
+    "createdByName": "মাতৃছায়া টেলিকম ক্লাউড এক্সপোর্ট",
+    "totalRecords": 295,
+    "financialSummary": "পূর্ণাঙ্গ ক্লাউড সেশন ব্যাকআপ (54 পণ্য, 18 অর্ডার, 6 রিটেইলার, 7 মহাজন, ইত্যাদি)",
+    "fileName": "backup_matrichaya_cloud_export.json",
+    "downloadUrl": "/api/backup/download",
+    "source": "server-file"
+  }
+]

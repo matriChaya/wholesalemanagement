@@ -1,0 +1,207 @@
+{
+  "entities": {
+    "CashTransfer": {
+      "title": "Cash Transfer",
+      "description": "Cash handover and bank/drawer transfers with pending and accepted statuses",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "transferNo": { "type": "string" },
+        "fromUserId": { "type": "string" },
+        "fromUserName": { "type": "string" },
+        "fromUserRole": { "type": "string" },
+        "toUserId": { "type": "string" },
+        "toUserName": { "type": "string" },
+        "toUserRole": { "type": "string" },
+        "amount": { "type": "number" },
+        "sourceAccount": { "type": "string" },
+        "targetAccount": { "type": "string" },
+        "status": { "type": "string", "enum": ["PENDING", "ACCEPTED", "REJECTED"] },
+        "notes": { "type": "string" },
+        "createdAt": { "type": "string" },
+        "acceptedAt": { "type": "string" },
+        "rejectedAt": { "type": "string" }
+      },
+      "required": ["id", "transferNo", "fromUserId", "toUserId", "amount", "status", "createdAt"]
+    },
+    "Product": {
+      "title": "Product",
+      "description": "Wholesale catalog inventory product",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "bnName": { "type": "string" },
+        "sku": { "type": "string" },
+        "category": { "type": "string" },
+        "costPrice": { "type": "number" },
+        "sellingPrice": { "type": "number" },
+        "stockQuantity": { "type": "number" },
+        "lowStockThreshold": { "type": "number" }
+      },
+      "required": ["id", "name", "sku", "costPrice", "sellingPrice", "stockQuantity"]
+    },
+    "OrderInvoice": {
+      "title": "Order Invoice",
+      "description": "Customer/retailer order invoices",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "invoiceNo": { "type": "string" },
+        "retailerId": { "type": "string" },
+        "retailerName": { "type": "string" },
+        "totalAmount": { "type": "number" },
+        "paidAmount": { "type": "number" },
+        "date": { "type": "string" },
+        "status": { "type": "string" }
+      },
+      "required": ["id", "invoiceNo", "retailerId", "totalAmount", "date"]
+    },
+    "UserProfile": {
+      "title": "User Profile",
+      "description": "Admin, Counter Cashier, DSR, and Retailer user accounts with cross-device sync",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "bnName": { "type": "string" },
+        "role": { "type": "string", "enum": ["admin", "counter", "dsr", "retailer"] },
+        "phone": { "type": "string" },
+        "pin": { "type": "string" },
+        "assignedCounterNo": { "type": "string" },
+        "routeArea": { "type": "string" },
+        "assignedCashDrawer": { "type": "number" },
+        "adminRef": { "type": "string" },
+        "adminPhone": { "type": "string" },
+        "adminName": { "type": "string" },
+        "adminEnterprise": { "type": "string" }
+      },
+      "required": ["id", "name", "role", "phone"]
+    },
+    "Retailer": {
+      "title": "Retailer",
+      "description": "Retail customer accounts with credit balance, due limits, and route location",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "shopName": { "type": "string" },
+        "phone": { "type": "string" },
+        "route": { "type": "string" },
+        "outstandingDue": { "type": "number" },
+        "creditLimit": { "type": "number" }
+      },
+      "required": ["id", "name", "shopName", "phone"]
+    },
+    "Supplier": {
+      "title": "Supplier",
+      "description": "Vendor and company suppliers for inventory purchases and claims",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "companyName": { "type": "string" },
+        "phone": { "type": "string" },
+        "currentPayable": { "type": "number" }
+      },
+      "required": ["id", "name", "phone"]
+    },
+    "SupplierLedgerEntry": {
+      "title": "Supplier Ledger Entry",
+      "description": "Ledger records of purchase challans, company payments, and return deductions",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "supplierId": { "type": "string" },
+        "challanNo": { "type": "string" },
+        "amount": { "type": "number" },
+        "date": { "type": "string" },
+        "type": { "type": "string" }
+      },
+      "required": ["id", "supplierId", "amount", "date"]
+    },
+    "CapitalTransaction": {
+      "title": "Capital Transaction",
+      "description": "Admin capital investment, bank withdrawals, and business drawings",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "type": { "type": "string" },
+        "amount": { "type": "number" },
+        "account": { "type": "string" },
+        "date": { "type": "string" }
+      },
+      "required": ["id", "type", "amount", "date"]
+    },
+    "ReplacementClaim": {
+      "title": "Replacement Claim",
+      "description": "Market and retailer product return / warranty replacement adjustments",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "claimNo": { "type": "string" },
+        "productId": { "type": "string" },
+        "quantity": { "type": "number" },
+        "date": { "type": "string" },
+        "status": { "type": "string" }
+      },
+      "required": ["id", "claimNo", "productId", "quantity", "date"]
+    },
+    "ActivityLog": {
+      "title": "Activity Log",
+      "description": "Audit trail log tracking cash transfers, invoices, balance adjustments, and staff actions",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "actionType": { "type": "string" },
+        "title": { "type": "string" },
+        "actorRole": { "type": "string" },
+        "actorName": { "type": "string" },
+        "timestamp": { "type": "string" }
+      },
+      "required": ["id", "actionType", "title", "actorRole", "actorName", "timestamp"]
+    }
+  },
+  "firestore": {
+    "activityLogs": {
+      "entity": "ActivityLog",
+      "description": "Collection of audit trail events and user actions"
+    },
+    "users": {
+      "entity": "UserProfile",
+      "description": "Collection of user profiles, staff credentials, and authentication data"
+    },
+    "cashTransfers": {
+      "entity": "CashTransfer",
+      "description": "Collection of cash transfers and handovers"
+    },
+    "products": {
+      "entity": "Product",
+      "description": "Collection of wholesale products"
+    },
+    "orders": {
+      "entity": "OrderInvoice",
+      "description": "Collection of wholesale sales orders"
+    },
+    "retailers": {
+      "entity": "Retailer",
+      "description": "Collection of retail customer stores and balances"
+    },
+    "suppliers": {
+      "entity": "Supplier",
+      "description": "Collection of wholesale suppliers"
+    },
+    "supplierLedger": {
+      "entity": "SupplierLedgerEntry",
+      "description": "Collection of supplier ledger transactions"
+    },
+    "capitalTransactions": {
+      "entity": "CapitalTransaction",
+      "description": "Collection of admin capital records"
+    },
+    "replacements": {
+      "entity": "ReplacementClaim",
+      "description": "Collection of replacement and market return claims"
+    }
+  }
+}

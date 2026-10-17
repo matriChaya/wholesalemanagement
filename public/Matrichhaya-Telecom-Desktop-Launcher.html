@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+  <meta charset="UTF-8">
+  <title>মাতৃছায়া টেলিকম - ডেস্কটপ লঞ্চার (Desktop Launcher)</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="icon" type="image/svg+xml" href="/icon.svg">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background-color: #020617;
+      color: #f8fafc;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      padding: 24px;
+    }
+    .launcher-card {
+      background: #0f172a;
+      border: 1px solid #1e293b;
+      border-radius: 28px;
+      max-width: 480px;
+      width: 100%;
+      padding: 36px 28px;
+      text-align: center;
+      box-shadow: 0 25px 60px -15px rgba(0, 0, 0, 0.85);
+    }
+    .icon-badge {
+      width: 84px;
+      height: 84px;
+      border-radius: 24px;
+      background: linear-gradient(135deg, #10b981 0%, #047857 100%);
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 40px;
+      margin-bottom: 20px;
+      box-shadow: 0 12px 24px -6px rgba(16, 185, 129, 0.4);
+    }
+    h1 {
+      font-size: 22px;
+      font-weight: 800;
+      color: #ffffff;
+      margin-bottom: 8px;
+    }
+    p {
+      color: #94a3b8;
+      font-size: 13px;
+      line-height: 1.6;
+      margin-bottom: 28px;
+    }
+    .launch-btn {
+      display: block;
+      width: 100%;
+      background: linear-gradient(135deg, #059669, #10b981);
+      color: #ffffff;
+      font-weight: 700;
+      font-size: 15px;
+      padding: 14px 20px;
+      border-radius: 16px;
+      text-decoration: none;
+      box-shadow: 0 10px 20px -5px rgba(5, 150, 105, 0.5);
+      transition: transform 0.15s, opacity 0.15s;
+    }
+    .launch-btn:hover {
+      opacity: 0.95;
+      transform: translateY(-1px);
+    }
+    .features {
+      margin-top: 24px;
+      padding-top: 20px;
+      border-top: 1px solid #1e293b;
+      font-size: 12px;
+      color: #64748b;
+      display: flex;
+      justify-content: space-around;
+    }
+  </style>
+  <script>
+    // When opened directly, redirect to the app root smoothly
+    const targetUrl = window.location.origin ? window.location.origin : "https://ais-pre-3wgi4u4u3ifdnk7qypox2b-897026234874.asia-southeast1.run.app";
+    setTimeout(() => {
+      window.location.replace(targetUrl);
+    }, 400);
+  </script>
+</head>
+<body>
+  <div class="launcher-card">
+    <div class="icon-badge">📱</div>
+    <h1>মাতৃছায়া টেলিকম</h1>
+    <p>হোলসেল ইআরপি, মোবাইল ডিস্ট্রিবিউশন ও ক্যাশ ম্যানেজমেন্ট সফটওয়্যার চালু হচ্ছে...</p>
+    <a href="/" class="launch-btn">সরাসরি প্রবেশ করুন (Open ERP)</a>
+    <div class="features">
+      <span>💻 ল্যাপটপ / পিসি</span>
+      <span>📱 মোবাইল</span>
+      <span>📱 ট্যাবলেট</span>
+    </div>
+  </div>
+</body>
+</html>

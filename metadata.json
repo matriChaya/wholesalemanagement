@@ -1,0 +1,10 @@
+{
+  "name": "Remix Remix Wholesale Management",
+  "description": "Comprehensive wholesale distribution \u0026 trade management app with multi-role access (Admin, Counter Sales, DSR, Retailer), dual Bangla \u0026 English language, Gemini Flash AI receipt scanning, Phonebook contact integration, cash transfer logs with confirmation, supplier ledgers, admin capital tracking, and product replacement adjustments.",
+  "requestFramePermissions": [
+    "camera"
+  ],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
