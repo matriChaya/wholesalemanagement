@@ -18,10 +18,28 @@
     <meta property="og:description" content="Paikari Trade (মাতৃছায়া টেলিকম) - পাইকারি ব্যবসা, মোবাইল ও পিসি ডিস্ট্রিবিউশন, ডিএসআর ও ক্যাশ কাউন্টার সেলস ম্যানেজমেন্ট ইআরপি" />
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Anek+Bangla:wght@400;500;600;700&family=Hind+Siliguri:wght@400;500;600;700&family=Noto+Sans+Bengali:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <link rel="preload" href="https://fonts.googleapis.com/css2?family=Anek+Bangla:wght@400;600;700&family=Hind+Siliguri:wght@400;600;700&family=Plus+Jakarta+Sans:wght@400;600;700&display=swap" as="style" onload="this.onload=null;this.rel='stylesheet'">
+    <noscript>
+      <link href="https://fonts.googleapis.com/css2?family=Anek+Bangla:wght@400;600;700&family=Hind+Siliguri:wght@400;600;700&family=Plus+Jakarta+Sans:wght@400;600;700&display=swap" rel="stylesheet">
+    </noscript>
   </head>
   <body class="bg-slate-950 text-slate-100 antialiased selection:bg-emerald-500 selection:text-white overflow-x-hidden">
-    <div id="root"></div>
+    <div id="root">
+      <!-- Fast Native Internal Storage Splash Screen (Visible instantly in <50ms while JavaScript initializes) -->
+      <div style="min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; background: #020617; color: #f8fafc; font-family: system-ui, -apple-system, sans-serif; padding: 20px; text-align: center;">
+        <div style="width: 72px; height: 72px; border-radius: 20px; background: linear-gradient(135deg, #059669, #0284c7); display: flex; align-items: center; justify-content: center; margin-bottom: 20px; box-shadow: 0 10px 25px -5px rgba(5, 150, 105, 0.4);">
+          <svg style="width: 40px; height: 40px; color: white;" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M12 21a9.004 9.004 0 008.716-6.747M12 21a9.004 9.004 0 01-8.716-6.747M12 21c2.485 0 4.5-4.03 4.5-9S14.485 3 12 3m0 18c-2.485 0-4.5-4.03-4.5-9S9.515 3 12 3m0 0a8.997 8.997 0 017.843 4.582M12 3a8.997 8.997 0 00-7.843 4.582m15.686 0A11.953 11.953 0 0112 10.5c-2.998 0-5.74-1.1-7.843-2.918m15.686 0A8.959 8.959 0 0121 12c0 .778-.099 1.533-.284 2.253m0 0A17.919 17.919 0 0112 16.5c-3.162 0-6.133-.815-8.716-2.247m0 0A9.015 9.015 0 013 12c0-.778.099-1.533.284-2.253"></path>
+          </svg>
+        </div>
+        <h1 style="font-size: 20px; font-weight: 700; margin: 0 0 6px 0; color: #f8fafc; letter-spacing: -0.02em;">মাতৃছায়া টেলিকম ERP</h1>
+        <p style="font-size: 13px; color: #94a3b8; margin: 0 0 24px 0;">মোবাইল ও পিসি ইন্টারনাল স্টোরেজ থেকে দ্রুত চালু হচ্ছে...</p>
+        <div style="width: 32px; height: 32px; border: 3px solid rgba(16, 185, 129, 0.2); border-top-color: #10b981; border-radius: 50%; animation: spin 0.8s linear infinite;"></div>
+        <style>
+          @keyframes spin { to { transform: rotate(360deg); } }
+        </style>
+      </div>
+    </div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

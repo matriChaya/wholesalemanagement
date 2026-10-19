@@ -80,10 +80,13 @@ export const BackupSyncModal: React.FC = () => {
     cashDSR,
     cashBank,
     currentUser,
+    pullFromGoogleDrive,
+    syncToGoogleDrive,
   } = useWholesale();
 
   const [syncStatusMsg, setSyncStatusMsg] = useState<{ type: 'success' | 'error' | 'info'; text: string } | null>(null);
   const [isRestoring, setIsRestoring] = useState<boolean>(false);
+  const [isPullingGDrive, setIsPullingGDrive] = useState<boolean>(false);
   const [restoreConfirmId, setRestoreConfirmId] = useState<string | null>(null);
   const [serverBackups, setServerBackups] = useState<any[]>([]);
   const [isLoadingServerBackups, setIsLoadingServerBackups] = useState<boolean>(false);
@@ -468,6 +471,34 @@ export const BackupSyncModal: React.FC = () => {
     }
   };
 
+  const handlePullGoogleDriveUpdates = async () => {
+    setIsPullingGDrive(true);
+    setSyncStatusMsg(null);
+    try {
+      const res = await pullFromGoogleDrive();
+      if (res.success) {
+        setSyncStatusMsg({
+          type: 'success',
+          text: res.message,
+        });
+        const files = await listGoogleDriveBackups();
+        setGDriveBackups(files);
+      } else {
+        setSyncStatusMsg({
+          type: 'error',
+          text: res.message,
+        });
+      }
+    } catch (err: any) {
+      setSyncStatusMsg({
+        type: 'error',
+        text: err?.message || 'গুগল ড্রাইভ থেকে ডাটা সিঙ্ক ব্যর্থ হয়েছে',
+      });
+    } finally {
+      setIsPullingGDrive(false);
+    }
+  };
+
   const handleDeleteGDriveBackup = async (file: GoogleDriveBackupFile) => {
     setConfirmDeleteGDriveId(null);
     try {
@@ -846,19 +877,43 @@ export const BackupSyncModal: React.FC = () => {
                       </button>
                     </div>
 
-                    <button
-                      onClick={handleUploadToGoogleDrive}
-                      disabled={isUploadingGDrive}
-                      id="btn-upload-google-drive-now"
-                      className="w-full py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-xs font-bold transition flex items-center justify-center gap-2 active:scale-95 disabled:opacity-50"
-                    >
-                      <Upload className={`w-3.5 h-3.5 ${isUploadingGDrive ? 'animate-spin' : ''}`} />
-                      <span>
-                        {isUploadingGDrive
-                          ? (language === 'bn' ? 'গুগল ড্রাইভে আপলোড হচ্ছে...' : 'Uploading...')
-                          : (language === 'bn' ? 'গুগল ড্রাইভে এখনই পূর্ণাঙ্গ ব্যাকআপ পাঠান' : 'Upload Full Backup to Drive Now')}
-                      </span>
-                    </button>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                      <button
+                        onClick={handleUploadToGoogleDrive}
+                        disabled={isUploadingGDrive}
+                        id="btn-upload-google-drive-now"
+                        className="w-full py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-xs font-bold transition flex items-center justify-center gap-1.5 active:scale-95 disabled:opacity-50 cursor-pointer shadow-sm"
+                        title="বর্তমান ডিভাইসের সকল মেমো ও হিসাব গুগল ড্রাইভে ক্লাউড ব্যাকআপ করুন"
+                      >
+                        <Upload className={`w-3.5 h-3.5 ${isUploadingGDrive ? 'animate-spin' : ''}`} />
+                        <span>
+                          {isUploadingGDrive
+                            ? (language === 'bn' ? 'আপলোড হচ্ছে...' : 'Uploading...')
+                            : (language === 'bn' ? '📤 ড্রাইভে ব্যাকআপ পাঠান' : 'Push to Drive')}
+                        </span>
+                      </button>
+
+                      <button
+                        onClick={handlePullGoogleDriveUpdates}
+                        disabled={isPullingGDrive}
+                        id="btn-pull-google-drive-now"
+                        className="w-full py-2 bg-emerald-700 hover:bg-emerald-600 text-white rounded-lg text-xs font-bold transition flex items-center justify-center gap-1.5 active:scale-95 disabled:opacity-50 cursor-pointer shadow-sm"
+                        title="গুগল ড্রাইভ থেকে অন্যান্য ডিভাইসের সকল সেলস ও হিসাব নামিয়ে বর্তমান ডিভাইসের সাথে সমন্বয় করুন"
+                      >
+                        <Download className={`w-3.5 h-3.5 ${isPullingGDrive ? 'animate-spin' : ''}`} />
+                        <span>
+                          {isPullingGDrive
+                            ? (language === 'bn' ? 'আপডেট হচ্ছে...' : 'Syncing...')
+                            : (language === 'bn' ? '📥 ড্রাইভ থেকে আপডেট নিন' : 'Pull & Merge')}
+                        </span>
+                      </button>
+                    </div>
+
+                    <p className="text-[10px] text-slate-300 leading-relaxed bg-slate-900/90 p-2 rounded-lg border border-slate-800">
+                      💡 {language === 'bn'
+                        ? 'যে কোনো জিমেইল দিয়ে কানেক্ট করা যায়। অফলাইনে মোবাইল ও কম্পিউটারের ইন্টারনাল স্টোরেজে সব তথ্য জমা থাকে। অনলাইনে আসলে তা ড্রাইভে স্বয়ংক্রিয় ব্যাকআপ হয় এবং অন্য যেকোনো ডিভাইস থেকে "ড্রাইভ থেকে আপডেট নিন" বাটনে চাপ দিলেই সব ডাটা এক নিমেষেই সমন্বয় হয়ে যাবে।'
+                        : 'Connect any Gmail account. Data is kept in internal device storage offline and auto-syncs to Google Drive when online. Click "Pull & Merge" on other devices to synchronize all changes.'}
+                    </p>
                   </div>
                 </div>
 

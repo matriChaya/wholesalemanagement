@@ -6,7 +6,6 @@ import { WeeklyStockMovementReport } from './WeeklyStockMovementReport';
 import { DualCashBalanceWidget } from './DualCashBalanceWidget';
 import { RecentActivityPanel } from './RecentActivityPanel';
 import { DealerDashboardGrid } from './DealerDashboardGrid';
-import { ConnectedDevicesFleetModal } from './ConnectedDevicesFleetModal';
 import {
   Sparkles,
   Coins,
@@ -105,12 +104,32 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
     downloadLocalBackupJSON,
     remotePendingDevices,
     registeredDevices,
+    isGoogleDriveConnected,
+    googleDriveAccount,
+    pullFromGoogleDrive,
+    syncToGoogleDrive,
+    openFleetModal,
   } = useWholesale();
 
   const [isRestoringData, setIsRestoringData] = useState<boolean>(false);
-  const [isFleetModalOpen, setIsFleetModalOpen] = useState<boolean>(false);
+  const [isPullingDrive, setIsPullingDrive] = useState<boolean>(false);
+  const [driveSyncToast, setDriveSyncToast] = useState<string | null>(null);
 
   const totalPendingCount = (remotePendingDevices || []).reduce((sum, d) => sum + (d.pendingFilesCount || 0), 0);
+
+  const handleQuickDriveSync = async () => {
+    setIsPullingDrive(true);
+    setDriveSyncToast(null);
+    try {
+      const res = await pullFromGoogleDrive();
+      // Push local master state after pull so other devices get latest updates
+      await syncToGoogleDrive().catch(() => {});
+      setDriveSyncToast(res.message);
+      setTimeout(() => setDriveSyncToast(null), 5000);
+    } finally {
+      setIsPullingDrive(false);
+    }
+  };
 
   const handleQuickRestore = async () => {
     setIsRestoringData(true);
@@ -349,15 +368,38 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
               type="button"
               onClick={openBackupModal}
               id="btn-dash-open-gdrive-backup"
-              className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 font-bold text-xs flex items-center gap-1.5 transition active:scale-95 cursor-pointer shadow-sm"
+              className={`px-3 py-1.5 rounded-xl border font-bold text-xs flex items-center gap-1.5 transition active:scale-95 cursor-pointer shadow-sm ${
+                isGoogleDriveConnected
+                  ? 'bg-sky-950/70 border-sky-500/50 text-sky-200 hover:bg-sky-900/80'
+                  : 'bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700'
+              }`}
               title="গুগল ড্রাইভ ও ক্লাউড ব্যাকআপ"
             >
               <Cloud className="w-3.5 h-3.5 text-sky-400" />
-              <span>{language === 'bn' ? 'গুগল ড্রাইভ ও ব্যাকআপ' : 'Google Drive & Backup'}</span>
+              <span>
+                {isGoogleDriveConnected && googleDriveAccount.email
+                  ? `ড্রাইভ (${googleDriveAccount.email.split('@')[0]})`
+                  : language === 'bn' ? 'গুগল ড্রাইভ ও ব্যাকআপ' : 'Google Drive & Backup'}
+              </span>
+              {isGoogleDriveConnected && <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />}
             </button>
+
+            {isGoogleDriveConnected && (
+              <button
+                type="button"
+                onClick={handleQuickDriveSync}
+                disabled={isPullingDrive}
+                id="btn-dash-quick-gdrive-pull"
+                className="px-2.5 py-1.5 rounded-xl bg-emerald-800/80 hover:bg-emerald-700 border border-emerald-500/40 text-emerald-100 font-bold text-xs flex items-center gap-1.5 transition active:scale-95 cursor-pointer shadow-sm"
+                title="গুগল ড্রাইভ থেকে অন্যান্য ডিভাইসের সকল সেলস ও ডাটা সিঙ্ক করুন"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 ${isPullingDrive ? 'animate-spin' : ''}`} />
+                <span>{isPullingDrive ? (language === 'bn' ? 'সিঙ্ক হচ্ছে...' : 'Syncing...') : (language === 'bn' ? 'ড্রাইভ সিঙ্ক' : 'Drive Sync')}</span>
+              </button>
+            )}
             <button
               type="button"
-              onClick={() => setIsFleetModalOpen(true)}
+              onClick={openFleetModal}
               id="btn-dash-open-fleet-modal"
               className="px-3 py-1.5 rounded-xl bg-purple-700 hover:bg-purple-600 text-white font-bold text-xs flex items-center gap-1.5 transition active:scale-95 cursor-pointer shadow-sm relative"
               title="সকল কানেক্টেড মোবাইল ও কম্পিউটার ডিভাইস ও পেন্ডিং ফাইলস তালিকা"
@@ -479,7 +521,7 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
             </div>
             <button
               type="button"
-              onClick={() => setIsFleetModalOpen(true)}
+              onClick={openFleetModal}
               className="px-3 py-1.5 rounded-xl bg-amber-600 hover:bg-amber-500 text-white font-bold text-xs flex items-center gap-1.5 shrink-0 transition active:scale-95 cursor-pointer shadow-sm"
             >
               <Smartphone className="w-3.5 h-3.5" />
@@ -1063,11 +1105,6 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
         />
       </div>
 
-      {/* Connected Devices Fleet & Pending Files Manager Modal */}
-      <ConnectedDevicesFleetModal
-        isOpen={isFleetModalOpen}
-        onClose={() => setIsFleetModalOpen(false)}
-      />
     </div>
   );
 };

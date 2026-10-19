@@ -608,6 +608,10 @@ interface WholesaleContextType {
   triggerManualBackup: () => Promise<{ success: boolean; backupId?: string; message: string }>;
   downloadLocalBackupJSON: () => Promise<void> | void;
   restoreFromBackupSnapshot: (snapshot: CloudBackupSnapshot) => Promise<{ success: boolean; message: string }>;
+  syncToGoogleDrive: () => Promise<{ success: boolean; message: string }>;
+  pullFromGoogleDrive: () => Promise<{ success: boolean; message: string; counts?: any }>;
+  isGoogleDriveConnected: boolean;
+  googleDriveAccount: { email: string | null; displayName: string | null };
 
   // Calculations
   totalCapitalInjected: number;
@@ -641,6 +645,10 @@ interface WholesaleContextType {
   refreshRegisteredDevices: () => Promise<void>;
   adminClearDevicePending: (deviceId: string) => Promise<{ success: boolean; message: string }>;
   adminUploadDevicePending: (deviceId: string) => Promise<{ success: boolean; message: string }>;
+  isFleetModalOpen: boolean;
+  setIsFleetModalOpen: (open: boolean) => void;
+  openFleetModal: () => void;
+  closeFleetModal: () => void;
 }
 
 export const DELETED_USERS_STORAGE_KEY = 'ws_deleted_user_ids';
@@ -1708,8 +1716,13 @@ export const WholesaleProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   const openStaffSyncModal = () => setIsStaffSyncModalOpen(true);
   const closeStaffSyncModal = () => setIsStaffSyncModalOpen(false);
 
+  const [isFleetModalOpen, setIsFleetModalOpen] = useState<boolean>(false);
+  const openFleetModal = () => setIsFleetModalOpen(true);
+  const closeFleetModal = () => setIsFleetModalOpen(false);
+
   const isInitialSeedDone = useRef<boolean>(false);
   const lastLocalSyncPingRef = useRef<number>(0);
+  const sendPresenceHeartbeatRef = useRef<() => void>(() => {});
 
   // Sync to safeStorage & mirror to limitless IndexedDB
   useEffect(() => {
@@ -2678,6 +2691,275 @@ export const WholesaleProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     }
   };
 
+  // Google Drive Active Account & Auth State
+  const [googleDriveAccount, setGoogleDriveAccount] = useState<{ email: string | null; displayName: string | null; isConnected: boolean }>(() => {
+    if (typeof window === 'undefined') return { email: null, displayName: null, isConnected: false };
+    try {
+      const u = localStorage.getItem('ws_gdrive_user');
+      const token = localStorage.getItem('ws_gdrive_access_token');
+      if (token && u) {
+        const parsed = JSON.parse(u);
+        return { email: parsed.email || null, displayName: parsed.displayName || null, isConnected: true };
+      }
+    } catch {}
+    return { email: null, displayName: null, isConnected: false };
+  });
+
+  const isGoogleDriveConnected = Boolean(googleDriveAccount.isConnected && googleDriveAccount.email);
+
+  useEffect(() => {
+    let unsub: (() => void) | undefined;
+    import('../services/googleDriveService').then(({ initGoogleDriveAuth }) => {
+      unsub = initGoogleDriveAuth((state) => {
+        setGoogleDriveAccount({
+          email: state.email,
+          displayName: state.displayName,
+          isConnected: state.isConnected,
+        });
+      });
+    }).catch(() => {});
+    return () => {
+      if (unsub) unsub();
+    };
+  }, []);
+
+  // Upload/Sync current master database state to Google Drive
+  const syncToGoogleDrive = useCallback(async (): Promise<{ success: boolean; message: string }> => {
+    try {
+      const { uploadBackupToGoogleDrive, isGoogleDriveConnected } = await import('../services/googleDriveService');
+      if (!isGoogleDriveConnected()) {
+        return { success: false, message: 'গুগল ড্রাইভ সংযুক্ত নেই। দয়া করে যে কোনো জিমেইল দিয়ে গুগল ড্রাইভে কানেক্ট করুন।' };
+      }
+
+      const backupId = `gdrive_sync_${Date.now()}`;
+      const timestamp = new Date().toISOString();
+      const snapshot: CloudBackupSnapshot = {
+        id: backupId,
+        timestamp,
+        version: '3.0',
+        createdBy: currentUser.id,
+        createdByName: currentUser.name,
+        counts: {
+          products: products.length,
+          orders: orders.length,
+          retailers: retailers.length,
+          suppliers: suppliers.length,
+          transfers: cashTransfers.length,
+          supplierLedger: supplierLedger.length,
+          capitalTransactions: capitalTransactions.length,
+          replacements: replacements.length,
+          companyReturns: companyReturns.length,
+          expenses: expenses.length,
+          users: users.length,
+        },
+        financials: {
+          totalReceivables: retailers.reduce((s, r) => s + (Number(r.balance) || 0), 0),
+          totalPayables: suppliers.reduce((s, sp) => s + (Number(sp.outstandingPayable) || 0), 0),
+          totalStockValue: products.reduce((s, p) => s + (p.stock || 0) * (p.purchasePrice || p.price || 0), 0),
+          adminCash: users.find((u) => u.role === 'admin')?.assignedCashDrawer || 0,
+          counterCash: users.find((u) => u.role === 'counter')?.assignedCashDrawer || 0,
+          dsrcash: users.find((u) => u.role === 'dsr')?.assignedCashDrawer || 0,
+          bankCash: (bankAccounts || []).reduce((s, b) => s + (b.balance || 0), 0),
+        },
+        data: {
+          products,
+          orders,
+          retailers,
+          suppliers,
+          supplierLedger,
+          cashTransfers,
+          capitalTransactions,
+          replacements,
+          companyReturns,
+          expenses,
+          users,
+          activityLogs: activityLogs.slice(0, 100),
+        },
+      };
+
+      const res = await uploadBackupToGoogleDrive(snapshot);
+      localStorage.setItem('ws_last_gdrive_sync_time', timestamp);
+      return { success: true, message: res.message };
+    } catch (err: any) {
+      return { success: false, message: err.message || 'গুগল ড্রাইভে ব্যাকআপ আপলোড ব্যর্থ হয়েছে' };
+    }
+  }, [
+    currentUser,
+    products,
+    orders,
+    retailers,
+    suppliers,
+    supplierLedger,
+    cashTransfers,
+    capitalTransactions,
+    replacements,
+    companyReturns,
+    expenses,
+    users,
+    activityLogs,
+    bankAccounts,
+  ]);
+
+  // Pull latest master file from Google Drive and merge without losing local data
+  const pullFromGoogleDrive = useCallback(async (): Promise<{ success: boolean; message: string; counts?: any }> => {
+    try {
+      const { pullLatestGoogleDriveData } = await import('../services/googleDriveService');
+      const res = await pullLatestGoogleDriveData();
+      if (!res.success || !res.data) {
+        return { success: false, message: res.message || 'গুগল ড্রাইভ থেকে কোনো ডাটা পাওয়া যায়নি।' };
+      }
+
+      const snap = res.data;
+      const snapData = snap.data || snap;
+
+      // 1. Merge Orders (by ID and invoiceNo)
+      const remoteOrders: OrderInvoice[] = Array.isArray(snapData.orders) ? snapData.orders : [];
+      if (remoteOrders.length > 0) {
+        setOrders((prev) => {
+          const map = new Map<string, OrderInvoice>();
+          remoteOrders.forEach((o) => {
+            if (o && (o.id || (o as any).invoiceNo)) map.set(o.id || (o as any).invoiceNo, o);
+          });
+          prev.forEach((o) => {
+            if (o && (o.id || (o as any).invoiceNo)) map.set(o.id || (o as any).invoiceNo, o);
+          });
+          const merged = sanitizeOrderProfits(Array.from(map.values()));
+          localStorage.setItem('ws_orders', JSON.stringify(merged));
+          idbSetState('ws_orders', merged);
+          return merged;
+        });
+      }
+
+      // 2. Merge Products
+      const remoteProducts: Product[] = Array.isArray(snapData.products) ? snapData.products : [];
+      if (remoteProducts.length > 0) {
+        setProducts((prev) => {
+          const map = new Map<string, Product>();
+          remoteProducts.forEach((p) => { if (p && p.id) map.set(p.id, p); });
+          prev.forEach((p) => { if (p && p.id) map.set(p.id, p); });
+          const merged = Array.from(map.values());
+          localStorage.setItem('ws_products', JSON.stringify(merged));
+          idbSetState('ws_products', merged);
+          return merged;
+        });
+      }
+
+      // 3. Merge Retailers
+      const remoteRetailers: Retailer[] = Array.isArray(snapData.retailers) ? snapData.retailers : [];
+      if (remoteRetailers.length > 0) {
+        setRetailers((prev) => {
+          const map = new Map<string, Retailer>();
+          remoteRetailers.forEach((r) => { if (r && r.id) map.set(r.id, r); });
+          prev.forEach((r) => { if (r && r.id) map.set(r.id, r); });
+          const merged = Array.from(map.values());
+          localStorage.setItem('ws_retailers', JSON.stringify(merged));
+          return merged;
+        });
+      }
+
+      // 4. Merge Suppliers & Supplier Ledger
+      const remoteSuppliers: Supplier[] = Array.isArray(snapData.suppliers) ? snapData.suppliers : [];
+      if (remoteSuppliers.length > 0) {
+        setSuppliers((prev) => {
+          const map = new Map<string, Supplier>();
+          remoteSuppliers.forEach((s) => { if (s && s.id) map.set(s.id, s); });
+          prev.forEach((s) => { if (s && s.id) map.set(s.id, s); });
+          const merged = Array.from(map.values());
+          localStorage.setItem('ws_suppliers', JSON.stringify(merged));
+          return merged;
+        });
+      }
+
+      const remoteLedger: SupplierLedgerEntry[] = Array.isArray(snapData.supplierLedger) ? snapData.supplierLedger : [];
+      if (remoteLedger.length > 0) {
+        setSupplierLedger((prev) => {
+          const map = new Map<string, SupplierLedgerEntry>();
+          remoteLedger.forEach((l) => { if (l && l.id) map.set(l.id, l); });
+          prev.forEach((l) => { if (l && l.id) map.set(l.id, l); });
+          const merged = Array.from(map.values());
+          localStorage.setItem('ws_supplier_ledger', JSON.stringify(merged));
+          return merged;
+        });
+      }
+
+      // 5. Merge Cash Transfers
+      const remoteTransfers: CashTransfer[] = Array.isArray(snapData.cashTransfers) ? snapData.cashTransfers : [];
+      if (remoteTransfers.length > 0) {
+        setCashTransfers((prev) => {
+          const map = new Map<string, CashTransfer>();
+          remoteTransfers.forEach((ct) => { if (ct && ct.id) map.set(ct.id, ct); });
+          prev.forEach((ct) => { if (ct && ct.id) map.set(ct.id, ct); });
+          const merged = Array.from(map.values());
+          localStorage.setItem('ws_cash_transfers', JSON.stringify(merged));
+          return merged;
+        });
+      }
+
+      // 6. Merge Replacements & Company Returns
+      if (Array.isArray(snapData.replacements) && snapData.replacements.length > 0) {
+        setReplacements((prev) => {
+          const map = new Map<string, ReplacementAdjustment>();
+          snapData.replacements.forEach((r: any) => { if (r && r.id) map.set(r.id, r); });
+          prev.forEach((r) => { if (r && r.id) map.set(r.id, r); });
+          const merged = Array.from(map.values());
+          localStorage.setItem('ws_replacements', JSON.stringify(merged));
+          return merged;
+        });
+      }
+
+      if (Array.isArray(snapData.companyReturns) && snapData.companyReturns.length > 0) {
+        setCompanyReturns((prev) => {
+          const map = new Map<string, CompanyReturnChallan>();
+          snapData.companyReturns.forEach((cr: any) => { if (cr && cr.id) map.set(cr.id, cr); });
+          prev.forEach((cr) => { if (cr && cr.id) map.set(cr.id, cr); });
+          const merged = Array.from(map.values());
+          localStorage.setItem('ws_company_returns', JSON.stringify(merged));
+          return merged;
+        });
+      }
+
+      return {
+        success: true,
+        message: `গুগল ড্রাইভ (${res.filename || 'মাস্টার ফাইল'}) থেকে সফলভাবে সকল ডিভাইস ডাটা আপডেট ও সমন্বয় করা হয়েছে!`,
+        counts: {
+          orders: remoteOrders.length,
+          products: remoteProducts.length,
+        },
+      };
+    } catch (err: any) {
+      return {
+        success: false,
+        message: err.message || 'গুগল ড্রাইভ থেকে ডাটা আপডেট করতে সমস্যা হয়েছে।',
+      };
+    }
+  }, []);
+
+  // Automatic Google Drive auto-sync on online & periodic timer
+  useEffect(() => {
+    const handleOnlineGoogleSync = async () => {
+      try {
+        const { isGoogleDriveConnected } = await import('../services/googleDriveService');
+        if (isGoogleDriveConnected() && localStorage.getItem('ws_gdrive_auto_sync') !== 'false') {
+          syncToGoogleDrive().catch(() => {});
+        }
+      } catch {}
+    };
+
+    window.addEventListener('online', handleOnlineGoogleSync);
+
+    // Periodic auto-backup every 4 minutes if online and connected
+    const gDriveInterval = setInterval(() => {
+      if (navigator.onLine && !isSimulatedOffline) {
+        handleOnlineGoogleSync();
+      }
+    }, 4 * 60 * 1000);
+
+    return () => {
+      window.removeEventListener('online', handleOnlineGoogleSync);
+      clearInterval(gDriveInterval);
+    };
+  }, [syncToGoogleDrive, isSimulatedOffline]);
+
   // Online / Offline window listeners with instant automatic sync upon connecting
   useEffect(() => {
     const handleOnline = () => {
@@ -3364,6 +3646,44 @@ export const WholesaleProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       (err) => console.warn('Realtime sync listener note:', err)
     );
 
+    // 12. Active Devices Cross-Network Live Presence Listener (Firestore Realtime)
+    const unsubActiveDevices = onSnapshot(
+      doc(db, 'system', 'active_devices'),
+      { includeMetadataChanges: true },
+      (docSnap) => {
+        if (docSnap.exists()) {
+          const rawData = docSnap.data();
+          const devList = Object.values(rawData || {})
+            .filter((d: any) => Boolean(d && d.deviceId))
+            .map((d: any) => {
+              const diffMs = Math.max(0, Date.now() - (d.lastHeartbeatMs || 0));
+              return {
+                ...d,
+                isOnline: diffMs <= 40000,
+                lastSeenSec: Math.floor(diffMs / 1000),
+              };
+            });
+          if (devList.length > 0) {
+            setRemoteServerDevices((prev) => {
+              const map = new Map<string, any>();
+              (prev || []).forEach((d) => { if (d && d.deviceId) map.set(d.deviceId, d); });
+              devList.forEach((d) => { if (d && d.deviceId) map.set(d.deviceId, { ...(map.get(d.deviceId) || {}), ...d }); });
+              return Array.from(map.values());
+            });
+            setRegisteredDevices((prev) => {
+              const map = new Map<string, any>();
+              (prev || []).forEach((d) => { if (d && d.deviceId) map.set(d.deviceId, d); });
+              devList.forEach((d) => { if (d && d.deviceId) map.set(d.deviceId, { ...(map.get(d.deviceId) || {}), ...d }); });
+              return Array.from(map.values());
+            });
+            const pendingList = devList.filter((d: any) => (d.pendingFilesCount || 0) > 0);
+            setRemotePendingDevices(pendingList);
+          }
+        }
+      },
+      (err) => console.warn('Active devices listener notice:', err)
+    );
+
     return () => {
       clearTimeout(seedTimer);
       unsubCashTransfers();
@@ -3379,6 +3699,7 @@ export const WholesaleProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       unsubUsers();
       unsubExpenses();
       unsubRealtimeSync();
+      unsubActiveDevices();
     };
   }, []);
 
@@ -3404,6 +3725,9 @@ export const WholesaleProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     } else {
       setIsBiometricLocked(false);
     }
+    setTimeout(() => {
+      try { sendPresenceHeartbeatRef.current(); } catch {}
+    }, 50);
   };
 
   const setCurrentUser = (user: UserProfile) => {
@@ -3418,6 +3742,9 @@ export const WholesaleProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     } else {
       setIsBiometricLocked(false);
     }
+    setTimeout(() => {
+      try { sendPresenceHeartbeatRef.current(); } catch {}
+    }, 50);
   };
 
   // Authentication & Registration Handlers
@@ -8816,6 +9143,22 @@ export const WholesaleProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   // Admin Clears Remote Device Pending Queue and saves to emergency backup
   const adminClearDevicePending = useCallback(async (deviceId: string): Promise<{ success: boolean; message: string }> => {
     try {
+      // 1. Clear on Firestore active_devices
+      if (db) {
+        setDoc(
+          doc(db, 'system', 'active_devices'),
+          {
+            [deviceId]: {
+              pendingFilesCount: 0,
+              pendingItems: [],
+              clearedAt: new Date().toISOString(),
+            },
+          },
+          { merge: true }
+        ).catch(() => {});
+      }
+
+      // 2. Clear on backend server and generate emergency backup JSON
       const res = await fetch('/api/device/pending-sync/clear-to-backup', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -8929,7 +9272,7 @@ export const WholesaleProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         } catch {}
       }
 
-      // 4. Update Firestore if connected
+      // 4. Update Firestore user document if connected
       if (db && currentUser?.id) {
         setDoc(
           doc(db, COLLECTIONS.USERS, currentUser.id),
@@ -8942,10 +9285,37 @@ export const WholesaleProvider: React.FC<{ children: React.ReactNode }> = ({ chi
           { merge: true }
         ).catch(() => {});
       }
+
+      // 5. Update Firestore System Active Devices (real-time cross-network fleet presence)
+      if (db) {
+        setDoc(
+          doc(db, 'system', 'active_devices'),
+          {
+            [devId]: {
+              deviceId: devId,
+              adminPhone: '01937200635',
+              role: currentRole,
+              phone: currentUser.phone || (currentRole === 'admin' ? '01937200635' : currentRole === 'counter' ? '01949663733' : '01615154653'),
+              name: currentUser.name || (currentRole === 'admin' ? 'মাতৃছায়া টেলিকম' : currentRole === 'counter' ? 'Asif' : 'Razo Alom'),
+              deviceType: deviceInfo,
+              lastHeartbeatMs: Date.now(),
+              lastSeenAt: nowIso,
+              isOnline: true,
+              pendingFilesCount: offlineSyncQueue.length,
+              pendingItems,
+            },
+          },
+          { merge: true }
+        ).catch(() => {});
+      }
     } catch {
       // ignore transient offline errors
     }
   }, [currentUser, currentRole, getDeviceId, offlineSyncQueue]);
+
+  useEffect(() => {
+    sendPresenceHeartbeatRef.current = sendPresenceHeartbeat;
+  }, [sendPresenceHeartbeat]);
 
   // Automatically pulse presence heartbeat periodically and on window focus/online
   useEffect(() => {
@@ -8968,12 +9338,13 @@ export const WholesaleProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   const getDevicePresence = useCallback(
     (roleOrUserId: string): { isOnline: boolean; lastActiveText: string; deviceText: string } => {
       const normalizedTarget = roleOrUserId.toLowerCase();
+      const targetCleanPhone = roleOrUserId.replace(/[^0-9]/g, '');
 
-      // Find all matching remote devices from server registry
+      // Find all matching remote devices from server registry or Firestore active devices
       const matchingRemotes = remoteServerDevices.filter((d) => {
         if (!d) return false;
         const dRole = (d.role || '').toLowerCase();
-        const dPhone = (d.phone || '');
+        const dPhone = (d.phone || '').replace(/[^0-9]/g, '');
         const dId = (d.deviceId || '');
         return (
           dRole === normalizedTarget ||
@@ -8981,12 +9352,16 @@ export const WholesaleProvider: React.FC<{ children: React.ReactNode }> = ({ chi
           (normalizedTarget.includes('admin') && dRole === 'admin') ||
           (normalizedTarget.includes('counter') && dRole === 'counter') ||
           (normalizedTarget.includes('dsr') && dRole === 'dsr') ||
-          (dPhone && roleOrUserId.includes(dPhone.slice(-8)))
+          (targetCleanPhone.length >= 8 && dPhone.includes(targetCleanPhone.slice(-8))) ||
+          (dPhone.length >= 8 && targetCleanPhone.includes(dPhone.slice(-8)))
         );
       });
 
-      // Is ANY remote device currently online?
-      const remoteOnlineDev = matchingRemotes.find((d) => Boolean(d.isOnline));
+      // Is ANY remote device currently online? (heartbeat within 40 seconds)
+      const remoteOnlineDev = matchingRemotes.find((d) => {
+        const diffMs = Math.max(0, Date.now() - (d.lastHeartbeatMs || 0));
+        return Boolean(d.isOnline) && diffMs <= 40000;
+      });
 
       // Local current device check
       const isCurrentDeviceRole =
@@ -9165,6 +9540,10 @@ export const WholesaleProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         triggerManualBackup,
         downloadLocalBackupJSON,
         restoreFromBackupSnapshot,
+        syncToGoogleDrive,
+        pullFromGoogleDrive,
+        isGoogleDriveConnected,
+        googleDriveAccount,
 
         // Live Multi-Device Staff Presence
         getDevicePresence,
@@ -9175,6 +9554,10 @@ export const WholesaleProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         refreshRegisteredDevices,
         adminClearDevicePending,
         adminUploadDevicePending,
+        isFleetModalOpen,
+        setIsFleetModalOpen,
+        openFleetModal,
+        closeFleetModal,
 
         // Biometric Authentication & Secure Storage Bridge
         isBiometricLocked,

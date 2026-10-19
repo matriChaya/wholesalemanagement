@@ -23,6 +23,7 @@ import { MultiDeviceStaffSyncModal } from './components/MultiDeviceStaffSyncModa
 import { SystemResetModal } from './components/SystemResetModal';
 import { InstallGuideModal } from './components/InstallGuideModal';
 import { BackupSyncModal } from './components/BackupSyncModal';
+import { ConnectedDevicesFleetModal } from './components/ConnectedDevicesFleetModal';
 import { DashboardOverview } from './components/DashboardOverview';
 import { PosInvoiceView } from './components/PosInvoiceView';
 import { CashTransferLog } from './components/CashTransferLog';
@@ -110,6 +111,8 @@ function MainAppContent() {
     isExpenseModalOpen,
     closeExpenseModal,
     expenseModalDefaultCategory,
+    isFleetModalOpen,
+    closeFleetModal,
   } = useWholesale();
 
   const t = translations[language];
@@ -597,6 +600,12 @@ function MainAppContent() {
 
       {/* Cloud Backup & Offline Synchronization Hub Modal */}
       <BackupSyncModal />
+
+      {/* Connected Devices Fleet & Pending Files Manager Modal */}
+      <ConnectedDevicesFleetModal
+        isOpen={isFleetModalOpen}
+        onClose={closeFleetModal}
+      />
 
       {/* Official Company Profile, Warehouse & Letterhead Settings Modal */}
       <BusinessProfileModal

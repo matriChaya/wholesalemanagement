@@ -87,6 +87,8 @@ export const AndroidHeader: React.FC<AndroidHeaderProps> = ({
     openResetModal,
     openStaffSyncModal,
     openBackupModal,
+    openFleetModal,
+    remotePendingDevices,
     cashAdmin,
     cashCounter,
     cashDSR,
@@ -578,6 +580,24 @@ export const AndroidHeader: React.FC<AndroidHeaderProps> = ({
             <Cloud className="w-3.5 h-3.5 text-sky-400" />
             <span className="hidden sm:inline font-bold">{language === 'bn' ? 'ড্রাইভ ব্যাকআপ' : 'Drive Backup'}</span>
           </button>
+
+          {/* Connected Devices Fleet & Pending Files Trigger for Admin */}
+          {currentRole === 'admin' && (
+            <button
+              onClick={openFleetModal}
+              id="btn-header-fleet-trigger"
+              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-purple-950/70 hover:bg-purple-900/80 text-purple-300 border border-purple-500/40 text-xs font-semibold transition-all active:scale-95 shadow-sm cursor-pointer relative"
+              title={language === 'bn' ? 'সকল কানেক্টেড মোবাইল ও কম্পিউটার ডিভাইস ও পেন্ডিং ফাইলস' : 'Connected Devices Fleet & Pending Files'}
+            >
+              <Smartphone className="w-3.5 h-3.5 text-purple-400" />
+              <span className="hidden sm:inline font-bold">{language === 'bn' ? 'ডিভাইস ও ফাইল' : 'Devices'}</span>
+              {(remotePendingDevices || []).reduce((sum, d) => sum + (d.pendingFilesCount || 0), 0) > 0 && (
+                <span className="px-1.5 py-0.2 rounded-full text-[10px] font-bold bg-amber-400 text-slate-950 font-mono animate-bounce">
+                  {(remotePendingDevices || []).reduce((sum, d) => sum + (d.pendingFilesCount || 0), 0)}
+                </span>
+              )}
+            </button>
+          )}
 
           {/* Staff & Team Management Trigger for Admin */}
           {currentRole === 'admin' && (

@@ -1,5 +1,5 @@
 // Service Worker for Full Offline PWA Support & Background Sync
-const CACHE_NAME = 'wholesale-offline-cache-v5';
+const CACHE_NAME = 'wholesale-offline-cache-v6';
 const PRECACHE_URLS = [
   '/',
   '/index.html',
