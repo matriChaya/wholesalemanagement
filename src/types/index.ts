@@ -184,6 +184,7 @@ export interface CashTransfer {
   amount: number;
   status: CashTransferStatus;
   createdAt: string;
+  customDate?: string;
   acceptedAt?: string;
   rejectedAt?: string;
   notes?: string;

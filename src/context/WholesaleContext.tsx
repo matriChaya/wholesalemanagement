@@ -636,6 +636,11 @@ interface WholesaleContextType {
   getDevicePresence: (roleOrUserId: string) => { isOnline: boolean; lastActiveText: string; deviceText: string };
   allStaffPresences: Array<{ id: string; name: string; bnName?: string; role: UserRole; phone: string; isOnline: boolean; lastActiveText: string; deviceText: string }>;
   sendPresenceHeartbeat: () => Promise<void>;
+  registeredDevices: Array<any>;
+  remotePendingDevices: Array<any>;
+  refreshRegisteredDevices: () => Promise<void>;
+  adminClearDevicePending: (deviceId: string) => Promise<{ success: boolean; message: string }>;
+  adminUploadDevicePending: (deviceId: string) => Promise<{ success: boolean; message: string }>;
 }
 
 export const DELETED_USERS_STORAGE_KEY = 'ws_deleted_user_ids';
@@ -1162,8 +1167,16 @@ export const WholesaleProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     }
     // Retain only genuine items (from purchases or JSON imports), purge default mock & Xiaomi / Symphony dummy names
     const cleanList = (parsed || []).filter((p) => p && p.id && !isDefaultMockProduct(p));
+    // Merge master products with local products
+    const productMap = new Map<string, Product>();
+    (initialProducts || []).forEach((p) => {
+      if (p && p.id && !isDefaultMockProduct(p)) productMap.set(p.id, p);
+    });
+    cleanList.forEach((p) => {
+      if (p && p.id && !isDefaultMockProduct(p)) productMap.set(p.id, p);
+    });
     // Deduplicate and merge identical products across invoices
-    const { merged } = mergeDuplicateProductsList(cleanList);
+    const { merged } = mergeDuplicateProductsList(Array.from(productMap.values()));
     if (typeof window !== 'undefined') {
       localStorage.setItem('ws_products', JSON.stringify(merged));
     }
@@ -1180,10 +1193,18 @@ export const WholesaleProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     }
     // Retain only genuine suppliers (from purchases or JSON imports), purge default mock & Xiaomi / Symphony dummy names
     const cleanList = (parsed || []).filter((s) => s && s.id && !isDefaultMockSupplier(s));
+    const suppMap = new Map<string, Supplier>();
+    (initialSuppliers || []).forEach((s) => {
+      if (s && s.id && !isDefaultMockSupplier(s)) suppMap.set(s.id, s);
+    });
+    cleanList.forEach((s) => {
+      if (s && s.id && !isDefaultMockSupplier(s)) suppMap.set(s.id, s);
+    });
+    const finalSuppliers = Array.from(suppMap.values());
     if (typeof window !== 'undefined') {
-      localStorage.setItem('ws_suppliers', JSON.stringify(cleanList));
+      localStorage.setItem('ws_suppliers', JSON.stringify(finalSuppliers));
     }
-    return cleanList;
+    return finalSuppliers;
   });
 
   const [supplierLedger, setSupplierLedger] = useState<SupplierLedgerEntry[]>(() => {
@@ -1208,10 +1229,18 @@ export const WholesaleProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         !(entry.supplierName || '').toLowerCase().includes('শাওমি') &&
         !(entry.supplierName || '').toLowerCase().includes('সিম্ফনি')
     );
+    const ledgerMap = new Map<string, SupplierLedgerEntry>();
+    (initialSupplierLedger || []).forEach((entry) => {
+      if (entry && entry.id) ledgerMap.set(entry.id, entry);
+    });
+    cleanParsed.forEach((entry) => {
+      if (entry && entry.id) ledgerMap.set(entry.id, entry);
+    });
+    const finalLedger = Array.from(ledgerMap.values());
     if (typeof window !== 'undefined') {
-      localStorage.setItem('ws_supplier_ledger', JSON.stringify(cleanParsed));
+      localStorage.setItem('ws_supplier_ledger', JSON.stringify(finalLedger));
     }
-    return cleanParsed;
+    return finalLedger;
   });
 
   const [retailers, setRetailers] = useState<Retailer[]>(() => {
@@ -1222,7 +1251,7 @@ export const WholesaleProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         parsed = JSON.parse(saved);
       } catch (e) {}
     }
-    // Filter out sample retailers (সততা টেলিকম, বিসমিল্লাহ টেলিকম, মিনি/নিউ মডার্ন মোবাইল, আল-মদিনা টেলিকম)
+    // Filter out sample retailers
     const cleanParsed = (parsed || []).filter(
       (r) =>
         r &&
@@ -1245,10 +1274,18 @@ export const WholesaleProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         !r.shopName?.includes('মিনি মডার্ন') &&
         !r.shopName?.includes('আল-মদিনা')
     );
+    const retMap = new Map<string, Retailer>();
+    (initialRetailers || []).forEach((r) => {
+      if (r && r.id) retMap.set(r.id, r);
+    });
+    cleanParsed.forEach((r) => {
+      if (r && r.id) retMap.set(r.id, r);
+    });
+    const finalRetailers = Array.from(retMap.values());
     if (typeof window !== 'undefined') {
-      localStorage.setItem('ws_retailers', JSON.stringify(cleanParsed));
+      localStorage.setItem('ws_retailers', JSON.stringify(finalRetailers));
     }
-    return cleanParsed;
+    return finalRetailers;
   });
 
   const [cashTransfers, setCashTransfers] = useState<CashTransfer[]>(() => {
@@ -1259,7 +1296,18 @@ export const WholesaleProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         parsed = JSON.parse(saved);
       } catch (e) {}
     }
-    return (parsed && parsed.length > 0) ? parsed : initialCashTransfers;
+    const transferMap = new Map<string, CashTransfer>();
+    (initialCashTransfers || []).forEach((ct) => {
+      if (ct && ct.id) transferMap.set(ct.id, ct);
+    });
+    (parsed || []).forEach((ct) => {
+      if (ct && ct.id) transferMap.set(ct.id, ct);
+    });
+    const finalTransfers = Array.from(transferMap.values());
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('ws_cash_transfers', JSON.stringify(finalTransfers));
+    }
+    return finalTransfers;
   });
 
   const [capitalTransactions, setCapitalTransactions] = useState<CapitalTransaction[]>(() => {
@@ -1281,7 +1329,14 @@ export const WholesaleProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         parsed = JSON.parse(saved);
       } catch (e) {}
     }
-    const list: ReplacementAdjustment[] = (parsed && parsed.length > 0) ? parsed : initialReplacements;
+    const repMap = new Map<string, ReplacementAdjustment>();
+    (initialReplacements || []).forEach((r) => {
+      if (r && r.id) repMap.set(r.id, r);
+    });
+    (parsed || []).forEach((r) => {
+      if (r && r.id) repMap.set(r.id, r);
+    });
+    const list: ReplacementAdjustment[] = Array.from(repMap.values());
     return list.map((r) => {
       const val = Number(r.estimatedValue ?? r.totalAdjustmentValue ?? 0);
       const safeVal = isNaN(val) ? 0 : val;
@@ -1329,7 +1384,7 @@ export const WholesaleProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         parsed = JSON.parse(saved);
       } catch (e) {}
     }
-    // Filter out any default sample sales referencing the 4 deleted retailers
+    // Filter out any default sample sales referencing deleted retailers
     const cleanParsed = (parsed || []).filter(
       (o) =>
         o &&
@@ -1351,8 +1406,20 @@ export const WholesaleProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         !o.customerName?.includes('মিনি মডার্ন') &&
         !o.customerName?.includes('আল-মদিনা')
     );
-    if (cleanParsed.length > 0) {
-      return sanitizeOrderProfits(cleanParsed);
+    // Combine initialOrders from verified backup with any newly created local orders
+    const ordersMap = new Map<string, OrderInvoice>();
+    (initialOrders || []).forEach((o) => {
+      if (o && o.id) ordersMap.set(o.id, o);
+    });
+    cleanParsed.forEach((o) => {
+      if (o && o.id) ordersMap.set(o.id, o);
+    });
+    const finalOrders = Array.from(ordersMap.values());
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('ws_orders', JSON.stringify(finalOrders));
+    }
+    if (finalOrders.length > 0) {
+      return sanitizeOrderProfits(finalOrders);
     }
     return initialOrders;
   });
@@ -1392,7 +1459,18 @@ export const WholesaleProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     const cleanParsed = (parsed || []).filter(
       (log) => log && log.id && !['act_01', 'act_02', 'act_03', 'act_04'].includes(log.id)
     );
-    return cleanParsed;
+    const actMap = new Map<string, ActivityLog>();
+    (initialActivityLogs || []).forEach((a) => {
+      if (a && a.id) actMap.set(a.id, a);
+    });
+    cleanParsed.forEach((a) => {
+      if (a && a.id) actMap.set(a.id, a);
+    });
+    const finalLogs = Array.from(actMap.values());
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('ws_activity_logs', JSON.stringify(finalLogs));
+    }
+    return finalLogs;
   });
 
   useEffect(() => {
@@ -1655,9 +1733,12 @@ export const WholesaleProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     safeStorage.setItem('ws_supplier_ledger', JSON.stringify(supplierLedger));
   }, [supplierLedger]);
 
+  const hasReconciledSuppliersRef = useRef<boolean>(false);
+
   // Auto-reconcile supplier totalPaid into supplierLedger if missing
   useEffect(() => {
-    if (!suppliers || suppliers.length === 0) return;
+    if (hasReconciledSuppliersRef.current || !suppliers || suppliers.length === 0) return;
+    hasReconciledSuppliersRef.current = true;
     const newEntries: SupplierLedgerEntry[] = [];
 
     suppliers.forEach((s) => {
@@ -2246,17 +2327,24 @@ export const WholesaleProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     }
     try {
       setIsSyncingToCloud(true);
+      let cleanOrders: OrderInvoice[] = orders;
       const ordersSnap = await getDocs(collection(db, COLLECTIONS.ORDERS));
-      const fetchedOrders: OrderInvoice[] = [];
-      ordersSnap.forEach((docItem) => {
-        const ord = docItem.data() as OrderInvoice;
-        fetchedOrders.push(ord);
-      });
-
-      fetchedOrders.sort((a, b) => new Date(b.date || b.createdAt || 0).getTime() - new Date(a.date || a.createdAt || 0).getTime());
-      const cleanOrders = sanitizeOrderProfits(fetchedOrders);
-      setOrders(cleanOrders);
-      localStorage.setItem('ws_orders', JSON.stringify(cleanOrders));
+      if (!ordersSnap.empty) {
+        const fetchedOrders: OrderInvoice[] = [];
+        ordersSnap.forEach((docItem) => {
+          const ord = docItem.data() as OrderInvoice;
+          if (ord && ord.id) fetchedOrders.push(ord);
+        });
+        const ordersMap = new Map<string, OrderInvoice>();
+        orders.forEach((o) => { if (o && o.id) ordersMap.set(o.id, o); });
+        fetchedOrders.forEach((o) => { if (o && o.id) ordersMap.set(o.id, o); });
+        const mergedOrders = Array.from(ordersMap.values()).sort(
+          (a, b) => new Date(b.date || b.createdAt || 0).getTime() - new Date(a.date || a.createdAt || 0).getTime()
+        );
+        cleanOrders = sanitizeOrderProfits(mergedOrders);
+        setOrders(cleanOrders);
+        localStorage.setItem('ws_orders', JSON.stringify(cleanOrders));
+      }
 
       // Also refresh replacements, transfers, products, suppliers, ledger, retailers, capital, expenses
       const [repSnap, trfSnap, prodSnap, supSnap, ledSnap, retSnap, capSnap, expSnap] = await Promise.all([
@@ -2270,16 +2358,31 @@ export const WholesaleProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         getDocs(collection(db, COLLECTIONS.EXPENSES)),
       ]);
 
-      const fetchedReps: ReplacementClaim[] = [];
-      repSnap.forEach((d) => fetchedReps.push(d.data() as ReplacementClaim));
-      setReplacements(fetchedReps);
-      localStorage.setItem('ws_replacements', JSON.stringify(fetchedReps));
+      if (!repSnap.empty) {
+        const repMap = new Map<string, ReplacementClaim>();
+        replacements.forEach((r) => { if (r && r.id) repMap.set(r.id, r); });
+        repSnap.forEach((d) => {
+          const rep = d.data() as ReplacementClaim;
+          if (rep && rep.id) repMap.set(rep.id, rep);
+        });
+        const fetchedReps = Array.from(repMap.values());
+        setReplacements(fetchedReps);
+        localStorage.setItem('ws_replacements', JSON.stringify(fetchedReps));
+      }
 
-      const fetchedTrfs: CashTransfer[] = [];
-      trfSnap.forEach((d) => fetchedTrfs.push(d.data() as CashTransfer));
-      fetchedTrfs.sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
-      setCashTransfers(fetchedTrfs);
-      localStorage.setItem('ws_cash_transfers', JSON.stringify(fetchedTrfs));
+      if (!trfSnap.empty) {
+        const trfMap = new Map<string, CashTransfer>();
+        cashTransfers.forEach((t) => { if (t && t.id) trfMap.set(t.id, t); });
+        trfSnap.forEach((d) => {
+          const trf = d.data() as CashTransfer;
+          if (trf && trf.id) trfMap.set(trf.id, trf);
+        });
+        const fetchedTrfs = Array.from(trfMap.values()).sort(
+          (a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime()
+        );
+        setCashTransfers(fetchedTrfs);
+        localStorage.setItem('ws_cash_transfers', JSON.stringify(fetchedTrfs));
+      }
 
       if (!prodSnap.empty) {
         const fetchedProds: Product[] = [];
@@ -8683,37 +8786,173 @@ export const WholesaleProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     });
   }, [users, cashAdmin]);
 
+  // Device Persistent Fingerprint
+  const getDeviceId = useCallback((): string => {
+    if (typeof window === 'undefined') return 'server_device';
+    let devId = localStorage.getItem('ws_device_fingerprint');
+    if (!devId) {
+      const isMob = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+      devId = `dev_${isMob ? 'mobile' : 'laptop'}_${Date.now().toString(36)}_${Math.random().toString(36).substring(2, 7)}`;
+      localStorage.setItem('ws_device_fingerprint', devId);
+    }
+    return devId;
+  }, []);
+
+  const [remoteServerDevices, setRemoteServerDevices] = useState<any[]>([]);
+  const [registeredDevices, setRegisteredDevices] = useState<any[]>([]);
+  const [remotePendingDevices, setRemotePendingDevices] = useState<any[]>([]);
+
+  // Refresh Registered Device Fleet
+  const refreshRegisteredDevices = useCallback(async () => {
+    try {
+      const res = await fetch('/api/device/list?adminPhone=01937200635');
+      const json = await res.json();
+      if (json.success && Array.isArray(json.devices)) {
+        setRegisteredDevices(json.devices);
+      }
+    } catch {}
+  }, []);
+
+  // Admin Clears Remote Device Pending Queue and saves to emergency backup
+  const adminClearDevicePending = useCallback(async (deviceId: string): Promise<{ success: boolean; message: string }> => {
+    try {
+      const res = await fetch('/api/device/pending-sync/clear-to-backup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ deviceId }),
+      });
+      const json = await res.json();
+      if (json.success) {
+        setRemotePendingDevices((prev) => prev.filter((d) => d.deviceId !== deviceId));
+        return { success: true, message: json.message };
+      }
+      return { success: false, message: json.error || 'Failed to clear device pending queue' };
+    } catch (e: any) {
+      return { success: false, message: e.message || 'Network error' };
+    }
+  }, []);
+
+  // Admin Force Uploads and Merges Remote Device Pending Queue
+  const adminUploadDevicePending = useCallback(async (deviceId: string): Promise<{ success: boolean; message: string }> => {
+    try {
+      const targetDev = remotePendingDevices.find((d) => d.deviceId === deviceId);
+      if (!targetDev || !Array.isArray(targetDev.pendingItems) || targetDev.pendingItems.length === 0) {
+        return { success: false, message: 'কোনো পেন্ডিং ফাইল পাওয়া যায়নি।' };
+      }
+
+      // Merge items if they are orders or cash transfers
+      let ordersAdded = 0;
+      targetDev.pendingItems.forEach((item: any) => {
+        if (item.entityType === 'orders' && item.payload) {
+          const ord = item.payload;
+          if (ord && ord.id) {
+            setOrders((prev) => {
+              if (prev.some((o) => o.id === ord.id)) return prev;
+              const next = [ord, ...prev];
+              localStorage.setItem('ws_orders', JSON.stringify(next));
+              return next;
+            });
+            ordersAdded++;
+          }
+        }
+      });
+
+      // Clear on server to backup
+      await adminClearDevicePending(deviceId);
+      return {
+        success: true,
+        message: `${targetDev.name} (${targetDev.role?.toUpperCase()})-এর ${targetDev.pendingFilesCount}টি পেন্ডিং ফাইল সফলভাবে ক্লাউডে আপলোড ও সিঙ্ক সম্পন্ন হয়েছে!`,
+      };
+    } catch (e: any) {
+      return { success: false, message: e.message || 'Upload failed' };
+    }
+  }, [remotePendingDevices, adminClearDevicePending]);
+
   // Live Multi-Device Staff Presence Heartbeat
   const sendPresenceHeartbeat = useCallback(async () => {
-    if (!db || !currentUser?.id) return;
     try {
       const isMobile =
         typeof navigator !== 'undefined' &&
         /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
       const deviceInfo = isMobile ? 'স্মার্টফোন (মোবাইল অ্যাপ)' : 'ল্যাপটপ / কম্পিউটার POS';
+      const devId = getDeviceId();
       const nowIso = new Date().toISOString();
 
-      await setDoc(
-        doc(db, COLLECTIONS.USERS, currentUser.id),
-        cleanFirestorePayload({
-          ...currentUser,
-          lastActiveAt: nowIso,
-          isOnline: true,
-          deviceInfo,
-        }),
-        { merge: true }
-      );
+      // Gather pending offline queue summary
+      const pendingItems = (offlineSyncQueue || []).slice(0, 10).map((q) => ({
+        id: q.id,
+        entityType: (q as any).entityType || q.collection,
+        action: q.action,
+        timestamp: q.timestamp,
+        title: (q.payload as any)?.invoiceNo || (q.payload as any)?.transferNo || (q.payload as any)?.description || 'পেন্ডিং ফাইল',
+        amount: (q.payload as any)?.totalAmount || (q.payload as any)?.amount || 0,
+        party: (q.payload as any)?.retailerName || (q.payload as any)?.customerName || (q.payload as any)?.toUserName || '',
+      }));
+
+      // 1. Send heartbeat & register to backend server
+      const heartbeatPayload = {
+        deviceId: devId,
+        adminPhone: '01937200635',
+        role: currentRole,
+        phone: currentUser.phone || (currentRole === 'admin' ? '01937200635' : currentRole === 'counter' ? '01949663733' : '01615154653'),
+        name: currentUser.name || (currentRole === 'admin' ? 'মাতৃছায়া টেলিকম' : currentRole === 'counter' ? 'Asif' : 'Razo Alom'),
+        deviceType: deviceInfo,
+        appVersion: '3.0.0',
+        pendingFilesCount: offlineSyncQueue.length,
+        pendingItems,
+      };
+
+      fetch('/api/presence/heartbeat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(heartbeatPayload),
+      }).catch(() => {});
+
+      // 2. Poll server presence status to know if remote devices are online
+      try {
+        const statusRes = await fetch('/api/presence/status?adminPhone=01937200635');
+        const statusJson = await statusRes.json();
+        if (statusJson.success && Array.isArray(statusJson.devices)) {
+          setRemoteServerDevices(statusJson.devices);
+          setRegisteredDevices(statusJson.devices);
+        }
+      } catch {}
+
+      // 3. Poll pending sync devices for Admin
+      if (currentRole === 'admin') {
+        try {
+          const pendingRes = await fetch('/api/device/pending-sync/all?adminPhone=01937200635');
+          const pendingJson = await pendingRes.json();
+          if (pendingJson.success && Array.isArray(pendingJson.devices)) {
+            setRemotePendingDevices(pendingJson.devices);
+          }
+        } catch {}
+      }
+
+      // 4. Update Firestore if connected
+      if (db && currentUser?.id) {
+        setDoc(
+          doc(db, COLLECTIONS.USERS, currentUser.id),
+          cleanFirestorePayload({
+            ...currentUser,
+            lastActiveAt: nowIso,
+            isOnline: true,
+            deviceInfo,
+          }),
+          { merge: true }
+        ).catch(() => {});
+      }
     } catch {
       // ignore transient offline errors
     }
-  }, [currentUser]);
+  }, [currentUser, currentRole, getDeviceId, offlineSyncQueue]);
 
   // Automatically pulse presence heartbeat periodically and on window focus/online
   useEffect(() => {
     sendPresenceHeartbeat();
     const interval = setInterval(() => {
       sendPresenceHeartbeat();
-    }, 25000);
+    }, 6000); // Pulse every 6 seconds for fast cross-device online status update
 
     const handleFocus = () => sendPresenceHeartbeat();
     window.addEventListener('focus', handleFocus);
@@ -8728,48 +8967,98 @@ export const WholesaleProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
   const getDevicePresence = useCallback(
     (roleOrUserId: string): { isOnline: boolean; lastActiveText: string; deviceText: string } => {
-      const user =
-        users.find((u) => u.id === roleOrUserId || u.role === roleOrUserId || (u.phone && u.phone.includes(roleOrUserId))) ||
-        (currentUser.id === roleOrUserId || currentUser.role === roleOrUserId ? currentUser : undefined);
+      const normalizedTarget = roleOrUserId.toLowerCase();
 
-      if (!user) {
-        return { isOnline: false, lastActiveText: language === 'bn' ? 'অফলাইন' : 'Offline', deviceText: 'ডিভাইস' };
-      }
+      // Find all matching remote devices from server registry
+      const matchingRemotes = remoteServerDevices.filter((d) => {
+        if (!d) return false;
+        const dRole = (d.role || '').toLowerCase();
+        const dPhone = (d.phone || '');
+        const dId = (d.deviceId || '');
+        return (
+          dRole === normalizedTarget ||
+          dId === roleOrUserId ||
+          (normalizedTarget.includes('admin') && dRole === 'admin') ||
+          (normalizedTarget.includes('counter') && dRole === 'counter') ||
+          (normalizedTarget.includes('dsr') && dRole === 'dsr') ||
+          (dPhone && roleOrUserId.includes(dPhone.slice(-8)))
+        );
+      });
 
-      if ((user.id === currentUser.id || user.role === currentUser.role) && isOnline) {
+      // Is ANY remote device currently online?
+      const remoteOnlineDev = matchingRemotes.find((d) => Boolean(d.isOnline));
+
+      // Local current device check
+      const isCurrentDeviceRole =
+        (currentUser.id === roleOrUserId || currentUser.role === roleOrUserId || (currentUser.phone && currentUser.phone.includes(roleOrUserId))) && isOnline;
+
+      if (isCurrentDeviceRole && remoteOnlineDev) {
         return {
           isOnline: true,
-          lastActiveText: language === 'bn' ? 'এই মুহূর্তে সক্রিয় (Online)' : 'Active Now (Online)',
-          deviceText: user.deviceInfo || (typeof navigator !== 'undefined' && /mobile/i.test(navigator.userAgent) ? 'স্মার্টফোন' : 'ল্যাপটপ / PC'),
+          lastActiveText: language === 'bn' ? 'সক্রিয় (বর্তমান ও রিমোট ২টি ডিভাইসে)' : 'Active (Local & Remote Devices)',
+          deviceText: `${remoteOnlineDev.deviceType || 'স্মার্টফোন'} + বর্তমান ডিভাইস`,
         };
       }
 
-      if (!user.lastActiveAt) {
-        return { isOnline: false, lastActiveText: language === 'bn' ? 'অফলাইন (লগইন হয়নি)' : 'Offline', deviceText: user.deviceInfo || 'ডিভাইস' };
+      if (isCurrentDeviceRole) {
+        const localDev = typeof navigator !== 'undefined' && /mobile/i.test(navigator.userAgent) ? 'স্মার্টফোন (বর্তমান ডিভাইস)' : 'ল্যাপটপ (বর্তমান ডিভাইস)';
+        return {
+          isOnline: true,
+          lastActiveText: language === 'bn' ? 'এই মুহূর্তে সক্রিয় (Online)' : 'Active Now (Online)',
+          deviceText: localDev,
+        };
       }
 
-      const lastMs = new Date(user.lastActiveAt).getTime();
-      const diffSec = Math.max(0, Math.floor((Date.now() - lastMs) / 1000));
-      const online = diffSec <= 85;
+      if (remoteOnlineDev) {
+        return {
+          isOnline: true,
+          lastActiveText: language === 'bn' ? 'এই মুহূর্তে অনলাইনে সক্রিয়' : 'Active Now (Online)',
+          deviceText: remoteOnlineDev.deviceType || (remoteOnlineDev.role === 'dsr' ? 'স্মার্টফোন' : 'ল্যাপটপ'),
+        };
+      }
 
-      let lastActiveText = language === 'bn' ? 'অনলাইন' : 'Online';
-      if (!online) {
-        const diffMin = Math.floor(diffSec / 60);
-        if (diffMin < 60) {
-          lastActiveText = language === 'bn' ? `${diffMin} মিনিট আগে` : `${diffMin}m ago`;
-        } else {
-          const diffHours = Math.floor(diffMin / 60);
-          lastActiveText = language === 'bn' ? `${diffHours} ঘণ্টা আগে` : `${diffHours}h ago`;
+      // If remote device was seen recently, find the most recently seen device
+      const latestSeen = matchingRemotes.slice().sort((a, b) => (b.lastHeartbeatMs || 0) - (a.lastHeartbeatMs || 0))[0];
+      if (latestSeen && latestSeen.lastSeenSec !== undefined) {
+        const sec = latestSeen.lastSeenSec;
+        const min = Math.floor(sec / 60);
+        let timeStr = language === 'bn' ? `${min} মিনিট আগে` : `${min}m ago`;
+        if (min >= 60) {
+          const hrs = Math.floor(min / 60);
+          timeStr = language === 'bn' ? `${hrs} ঘণ্টা আগে` : `${hrs}h ago`;
         }
+        return {
+          isOnline: false,
+          lastActiveText: timeStr,
+          deviceText: latestSeen.deviceType || 'ডিভাইস',
+        };
+      }
+
+      // Fallback to Firestore users collection
+      const user = users.find((u) => u.id === roleOrUserId || u.role === roleOrUserId || (u.phone && u.phone.includes(roleOrUserId)));
+      if (user && user.lastActiveAt) {
+        const lastMs = new Date(user.lastActiveAt).getTime();
+        const diffSec = Math.max(0, Math.floor((Date.now() - lastMs) / 1000));
+        const online = diffSec <= 45;
+        let lastActiveText = language === 'bn' ? 'অনলাইন' : 'Online';
+        if (!online) {
+          const diffMin = Math.floor(diffSec / 60);
+          lastActiveText = diffMin < 60 ? (language === 'bn' ? `${diffMin} মিনিট আগে` : `${diffMin}m ago`) : (language === 'bn' ? `${Math.floor(diffMin / 60)} ঘণ্টা আগে` : `${Math.floor(diffMin / 60)}h ago`);
+        }
+        return {
+          isOnline: online,
+          lastActiveText,
+          deviceText: user.deviceInfo || 'ডিভাইস',
+        };
       }
 
       return {
-        isOnline: online,
-        lastActiveText,
-        deviceText: user.deviceInfo || 'ডিভাইস',
+        isOnline: false,
+        lastActiveText: language === 'bn' ? 'অফলাইন (লগইন হয়নি)' : 'Offline',
+        deviceText: 'ডিভাইস',
       };
     },
-    [users, currentUser, isOnline, language]
+    [remoteServerDevices, currentUser, isOnline, language, users]
   );
 
   const allStaffPresences = useMemo(() => {
@@ -8784,7 +9073,7 @@ export const WholesaleProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       const user = users.find(
         (u) => u.id === def.id || u.role === def.role || (u.phone && u.phone.includes(def.phone.slice(-8)))
       );
-      const pres = getDevicePresence(def.id);
+      const pres = getDevicePresence(def.role);
       return {
         id: def.id,
         role: def.role,
@@ -8881,6 +9170,11 @@ export const WholesaleProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         getDevicePresence,
         allStaffPresences,
         sendPresenceHeartbeat,
+        registeredDevices,
+        remotePendingDevices,
+        refreshRegisteredDevices,
+        adminClearDevicePending,
+        adminUploadDevicePending,
 
         // Biometric Authentication & Secure Storage Bridge
         isBiometricLocked,

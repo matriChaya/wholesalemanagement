@@ -205,21 +205,14 @@ export const PosInvoiceView: React.FC<PosInvoiceViewProps> = ({ onOpenPhonebookM
     return getSequentialInvoiceNo(getTodayDateString(), orders);
   });
   const [selectedCreatorId, setSelectedCreatorId] = useState<string>(currentUser.id);
-  // Auto-filter based on active role: Counter -> only counter sales; DSR -> only DSR sales; Admin -> admin sales by default
-  const [creatorFilter, setCreatorFilter] = useState<string>(() => {
-    if (currentRole === 'counter') return 'counter';
-    if (currentRole === 'dsr') return 'dsr';
-    return 'admin';
-  });
+  // Auto-filter based on active role: default to 'ALL' so all transaction memos are immediately visible
+  const [creatorFilter, setCreatorFilter] = useState<string>('ALL');
 
-  // Automatically switch creatorFilter when user role changes
+  // When switching roles, keep 'ALL' as primary view to prevent hiding transactions
   useEffect(() => {
-    if (currentRole === 'counter') {
-      setCreatorFilter('counter');
-    } else if (currentRole === 'dsr') {
-      setCreatorFilter('dsr');
-    } else if (currentRole === 'admin') {
-      setCreatorFilter('admin');
+    // If user has specific filter selected, preserve, otherwise ensure ALL is default
+    if (!creatorFilter) {
+      setCreatorFilter('ALL');
     }
   }, [currentRole]);
 
@@ -3365,9 +3358,33 @@ export const PosInvoiceView: React.FC<PosInvoiceViewProps> = ({ onOpenPhonebookM
                       </div>
                     ) : currentRole === 'dsr' ? (
                       <div className="flex flex-wrap items-center gap-2">
-                        <div className="flex items-center gap-2 bg-indigo-950/70 border border-indigo-700/60 px-3 py-1.5 rounded-xl text-xs font-bold text-indigo-300 shadow-sm">
-                          <Truck className="w-3.5 h-3.5 text-indigo-400" />
-                          <span>🚚 ডিএসআর সেলস ({dsrOrdersCount}টি চালান)</span>
+                        <div className="flex items-center gap-1 bg-slate-950 p-1 rounded-xl border border-slate-800 text-[11px]">
+                          <button
+                            type="button"
+                            onClick={() => setCreatorFilter('dsr')}
+                            className={`px-2.5 py-1 rounded-lg font-bold transition flex items-center gap-1.5 cursor-pointer ${
+                              creatorFilter === 'dsr'
+                                ? 'bg-indigo-600 text-white shadow-sm'
+                                : 'text-slate-400 hover:text-white'
+                            }`}
+                            title="আমার ডিএসআর ফিল্ড সেলস চালান"
+                          >
+                            <Truck className="w-3.5 h-3.5" />
+                            <span>🚚 আমার ডিএসআর ({dsrOrdersCount})</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setCreatorFilter('ALL')}
+                            className={`px-2.5 py-1 rounded-lg font-bold transition flex items-center gap-1.5 cursor-pointer ${
+                              creatorFilter === 'ALL'
+                                ? 'bg-emerald-600 text-white shadow-sm'
+                                : 'text-slate-400 hover:text-white'
+                            }`}
+                            title="সকল বিক্রয় মেমো"
+                          >
+                            <FileText className="w-3.5 h-3.5" />
+                            <span>📋 সকল মেমো ({orders.length})</span>
+                          </button>
                         </div>
                         <button
                           type="button"
@@ -3383,9 +3400,33 @@ export const PosInvoiceView: React.FC<PosInvoiceViewProps> = ({ onOpenPhonebookM
                       </div>
                     ) : (
                       <div className="flex flex-wrap items-center gap-2">
-                        <div className="flex items-center gap-2 bg-sky-950/70 border border-sky-700/60 px-3 py-1.5 rounded-xl text-xs font-bold text-sky-300 shadow-sm">
-                          <Store className="w-3.5 h-3.5 text-sky-400" />
-                          <span>🖥️ কাউন্টার সেলস ({counterOrdersCount}টি চালান)</span>
+                        <div className="flex items-center gap-1 bg-slate-950 p-1 rounded-xl border border-slate-800 text-[11px]">
+                          <button
+                            type="button"
+                            onClick={() => setCreatorFilter('counter')}
+                            className={`px-2.5 py-1 rounded-lg font-bold transition flex items-center gap-1.5 cursor-pointer ${
+                              creatorFilter === 'counter'
+                                ? 'bg-sky-600 text-white shadow-sm'
+                                : 'text-slate-400 hover:text-white'
+                            }`}
+                            title="আমার কাউন্টার সেলস চালান"
+                          >
+                            <Store className="w-3.5 h-3.5" />
+                            <span>🖥️ আমার কাউন্টার ({counterOrdersCount})</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setCreatorFilter('ALL')}
+                            className={`px-2.5 py-1 rounded-lg font-bold transition flex items-center gap-1.5 cursor-pointer ${
+                              creatorFilter === 'ALL'
+                                ? 'bg-emerald-600 text-white shadow-sm'
+                                : 'text-slate-400 hover:text-white'
+                            }`}
+                            title="সকল বিক্রয় মেমো"
+                          >
+                            <FileText className="w-3.5 h-3.5" />
+                            <span>📋 সকল মেমো ({orders.length})</span>
+                          </button>
                         </div>
                         <button
                           type="button"
@@ -3587,8 +3628,36 @@ export const PosInvoiceView: React.FC<PosInvoiceViewProps> = ({ onOpenPhonebookM
                 </div>
               )
             ) : filteredOrders.length === 0 ? (
-              <div className="py-12 text-center text-slate-500 text-xs">
-                {language === 'bn' ? 'কোন বিক্রয় মেমো পাওয়া যায়নি' : 'No sales invoices found.'}
+              <div className="py-12 text-center space-y-3 bg-slate-950/60 rounded-2xl border border-slate-800 p-6">
+                <FileText className="w-8 h-8 text-slate-500 mx-auto" />
+                <p className="text-sm font-semibold text-slate-300">
+                  {language === 'bn'
+                    ? 'নির্বাচিত ফিল্টারে কোনো মেমো পাওয়া যায়নি'
+                    : 'No sales invoices found matching the current filter.'}
+                </p>
+                {orders.length > 0 && (
+                  <p className="text-xs text-slate-400">
+                    {language === 'bn'
+                      ? `সিস্টেমে মোট ${orders.length}টি বিক্রয় মেমো সংরক্ষিত রয়েছে। সকল মেমো ও লেনদেন দেখতে নিচের বাটন চাপুন:`
+                      : `Total ${orders.length} memos available. Click below to view all:`}
+                  </p>
+                )}
+                {orders.length > 0 && (
+                  <div className="flex justify-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setInvoiceDateFilter('ALL');
+                        setCreatorFilter('ALL');
+                        setSearchInvoice('');
+                      }}
+                      className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow-md active:scale-95 cursor-pointer"
+                    >
+                      <RefreshCw className="w-3.5 h-3.5" />
+                      <span>{language === 'bn' ? 'সকল তারিখ ও লেনদেন দেখুন' : 'Show All Dates & Transactions'}</span>
+                    </button>
+                  </div>
+                )}
               </div>
             ) : (
               <div className="space-y-2.5 max-h-[600px] overflow-y-auto pr-1">

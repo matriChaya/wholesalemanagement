@@ -69,21 +69,31 @@ export const initialUsers: UserProfile[] = [
   },
 ];
 
+import {
+  masterProducts,
+  masterSuppliers,
+  masterRetailers,
+  masterSupplierLedger,
+  masterCashTransfers,
+  masterReplacements,
+  masterActivityLogs,
+} from './masterBackupData';
+
 /**
- * Clean slate initial suppliers and products:
- * Automatic default mock names (Xiaomi, Symphony, etc.) are eliminated.
- * Only genuine purchased items and JSON imported database records will exist.
+ * Master verified data from system backup:
+ * Preserves all genuine products, suppliers, retailers, ledger entries,
+ * cash transfers, and replacements across laptop, mobile, and web.
  */
-export const initialSuppliers: Supplier[] = [];
-export const initialProducts: Product[] = [];
+export const initialSuppliers: Supplier[] = masterSuppliers;
+export const initialProducts: Product[] = masterProducts;
 
-export const initialRetailers: Retailer[] = [];
+export const initialRetailers: Retailer[] = masterRetailers;
 
-export const initialSupplierLedger: SupplierLedgerEntry[] = [];
+export const initialSupplierLedger: SupplierLedgerEntry[] = masterSupplierLedger;
 
 // initialOrders (clean slate, manual / scanned entries only) imported from ./ordersData
 
-export const initialCashTransfers: CashTransfer[] = [];
+export const initialCashTransfers: CashTransfer[] = masterCashTransfers;
 
 export const initialBankAccounts: BankAccount[] = [
   {
@@ -124,10 +134,11 @@ export const initialBankAccounts: BankAccount[] = [
 
 export const initialCapitalTransactions: CapitalTransaction[] = [];
 
-export const initialReplacements: ReplacementAdjustment[] = [];
+export const initialReplacements: ReplacementAdjustment[] = masterReplacements;
 
 export const samplePhonebookContacts: PhoneContact[] = [];
 
-export const initialActivityLogs: ActivityLog[] = [];
+export const initialActivityLogs: ActivityLog[] = masterActivityLogs;
 
 export const initialExpenses: Expense[] = [];
+

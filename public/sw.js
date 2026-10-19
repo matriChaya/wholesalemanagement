@@ -53,22 +53,25 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Navigation requests (HTML pages): Network-first, fallback to cached index.html
+  // Navigation requests (HTML pages): Stale-While-Revalidate for INSTANT launch from internal storage
   if (event.request.mode === 'navigate') {
     event.respondWith(
-      fetch(event.request)
-        .then((response) => {
-          if (response.status === 200) {
-            const copy = response.clone();
-            caches.open(CACHE_NAME).then((cache) => cache.put(event.request, copy));
-          }
-          return response;
-        })
-        .catch(() => {
-          return caches.match('/index.html').then((cached) => {
+      caches.match('/index.html').then((cached) => {
+        const fetchPromise = fetch(event.request)
+          .then((networkResponse) => {
+            if (networkResponse && networkResponse.status === 200) {
+              const copy = networkResponse.clone();
+              caches.open(CACHE_NAME).then((cache) => cache.put('/index.html', copy));
+            }
+            return networkResponse;
+          })
+          .catch(() => {
             return cached || caches.match('/') || new Response('Offline', { status: 200, headers: { 'Content-Type': 'text/html' } });
           });
-        })
+
+        // If cached in device storage, launch instantly; otherwise wait for network
+        return cached || fetchPromise;
+      })
     );
     return;
   }

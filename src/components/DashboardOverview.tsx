@@ -6,6 +6,7 @@ import { WeeklyStockMovementReport } from './WeeklyStockMovementReport';
 import { DualCashBalanceWidget } from './DualCashBalanceWidget';
 import { RecentActivityPanel } from './RecentActivityPanel';
 import { DealerDashboardGrid } from './DealerDashboardGrid';
+import { ConnectedDevicesFleetModal } from './ConnectedDevicesFleetModal';
 import {
   Sparkles,
   Coins,
@@ -102,9 +103,14 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
     openStaffSyncModal,
     openBackupModal,
     downloadLocalBackupJSON,
+    remotePendingDevices,
+    registeredDevices,
   } = useWholesale();
 
   const [isRestoringData, setIsRestoringData] = useState<boolean>(false);
+  const [isFleetModalOpen, setIsFleetModalOpen] = useState<boolean>(false);
+
+  const totalPendingCount = (remotePendingDevices || []).reduce((sum, d) => sum + (d.pendingFilesCount || 0), 0);
 
   const handleQuickRestore = async () => {
     setIsRestoringData(true);
@@ -351,6 +357,21 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
             </button>
             <button
               type="button"
+              onClick={() => setIsFleetModalOpen(true)}
+              id="btn-dash-open-fleet-modal"
+              className="px-3 py-1.5 rounded-xl bg-purple-700 hover:bg-purple-600 text-white font-bold text-xs flex items-center gap-1.5 transition active:scale-95 cursor-pointer shadow-sm relative"
+              title="সকল কানেক্টেড মোবাইল ও কম্পিউটার ডিভাইস ও পেন্ডিং ফাইলস তালিকা"
+            >
+              <Smartphone className="w-3.5 h-3.5 text-purple-200" />
+              <span>{language === 'bn' ? 'কানেক্টেড ডিভাইস ও পেন্ডিং' : 'Devices & Pending Files'}</span>
+              {totalPendingCount > 0 && (
+                <span className="px-1.5 py-0.2 rounded-full text-[10px] font-bold bg-amber-400 text-slate-950 font-mono animate-bounce">
+                  {totalPendingCount}
+                </span>
+              )}
+            </button>
+            <button
+              type="button"
               onClick={downloadLocalBackupJSON}
               id="btn-dash-download-master-json"
               className="px-3 py-1.5 rounded-xl bg-emerald-700 hover:bg-emerald-600 text-white font-bold text-xs flex items-center gap-1.5 transition active:scale-95 cursor-pointer shadow-sm"
@@ -435,6 +456,37 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
             );
           })}
         </div>
+
+        {/* Pending Offline Files Alert Banner */}
+        {totalPendingCount > 0 && (
+          <div className="mt-2.5 p-3 rounded-xl bg-amber-950/60 border border-amber-500/40 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs animate-in fade-in">
+            <div className="flex items-center gap-2.5">
+              <div className="w-8 h-8 rounded-lg bg-amber-500/20 text-amber-400 border border-amber-500/40 flex items-center justify-center shrink-0 font-bold">
+                ⚠️
+              </div>
+              <div>
+                <span className="font-bold text-amber-200 block text-xs sm:text-sm">
+                  {language === 'bn'
+                    ? `সতর্কতা: স্টাফ ডিভাইসে মোট ${totalPendingCount}টি অফলাইন ফাইল পেন্ডিং রয়েছে!`
+                    : `Alert: ${totalPendingCount} offline pending files found across staff devices!`}
+                </span>
+                <p className="text-[11px] text-amber-300/80 mt-0.5">
+                  {language === 'bn'
+                    ? 'এডমিন প্যানেল থেকে এই ফাইলগুলো সরাসরি ক্লাউড ডাটাবেসে আপলোড করতে পারেন অথবা ক্লিয়ার করে ইমার্জেন্সি ব্যাকআপে রাখতে পারেন।'
+                    : 'Upload these pending files to cloud database or clear them to an emergency backup.'}
+                </p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => setIsFleetModalOpen(true)}
+              className="px-3 py-1.5 rounded-xl bg-amber-600 hover:bg-amber-500 text-white font-bold text-xs flex items-center gap-1.5 shrink-0 transition active:scale-95 cursor-pointer shadow-sm"
+            >
+              <Smartphone className="w-3.5 h-3.5" />
+              <span>{language === 'bn' ? 'পেন্ডিং ফাইল কন্ট্রোল ও আপলোড' : 'Manage Pending Files'}</span>
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Quick Recovery Banner if Accounts or Sales are 0/empty */}
@@ -1010,6 +1062,12 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
           onViewAll={() => onNavigateTab('transfers')}
         />
       </div>
+
+      {/* Connected Devices Fleet & Pending Files Manager Modal */}
+      <ConnectedDevicesFleetModal
+        isOpen={isFleetModalOpen}
+        onClose={() => setIsFleetModalOpen(false)}
+      />
     </div>
   );
 };

@@ -255,6 +255,312 @@ app.get(["/api/backup/download", "/api/backup/export-json", "/api/backup/downloa
 // Explicit static serving for downloads folder before Vite
 app.use("/downloads", express.static(path.join(process.cwd(), "public", "downloads")));
 
+// ==========================================
+// REAL-TIME MULTI-DEVICE PRESENCE & FLEET REGISTRY
+// ==========================================
+interface DeviceRecord {
+  deviceId: string;
+  adminPhone: string;
+  role: 'admin' | 'counter' | 'dsr';
+  phone: string;
+  name: string;
+  deviceType: string;
+  userAgent?: string;
+  firstInstalledAt: string;
+  lastSeenAt: string;
+  lastHeartbeatMs: number;
+  ip?: string;
+  appVersion?: string;
+  pendingFilesCount: number;
+  pendingItems?: any[];
+}
+
+const DEVICES_FILE = path.join(process.cwd(), "data", "devices_registry.json");
+const devicesMap = new Map<string, DeviceRecord>();
+
+// Ensure data folder exists
+try {
+  const dataDir = path.join(process.cwd(), "data");
+  if (!fs.existsSync(dataDir)) {
+    fs.mkdirSync(dataDir, { recursive: true });
+  }
+  if (fs.existsSync(DEVICES_FILE)) {
+    const list: DeviceRecord[] = JSON.parse(fs.readFileSync(DEVICES_FILE, "utf-8"));
+    if (Array.isArray(list)) {
+      list.forEach((dev) => {
+        if (dev && dev.deviceId) devicesMap.set(dev.deviceId, dev);
+      });
+    }
+  }
+} catch (e) {
+  console.warn("Could not load devices registry:", e);
+}
+
+function saveDevicesRegistry() {
+  try {
+    const arr = Array.from(devicesMap.values());
+    fs.writeFileSync(DEVICES_FILE, JSON.stringify(arr, null, 2), "utf-8");
+  } catch (e) {
+    console.warn("Could not save devices registry:", e);
+  }
+}
+
+// 1. Device Registration Endpoint (Called upon login or installation on any device)
+app.post("/api/device/register", (req, res) => {
+  try {
+    const { deviceId, adminPhone = "01937200635", role, phone, name, deviceType, appVersion } = req.body;
+    if (!deviceId) return res.status(400).json({ success: false, error: "Missing deviceId" });
+
+    const nowIso = new Date().toISOString();
+    const existing = devicesMap.get(deviceId);
+    const updated: DeviceRecord = {
+      deviceId,
+      adminPhone: adminPhone || "01937200635",
+      role: role || (existing ? existing.role : "counter"),
+      phone: phone || (existing ? existing.phone : ""),
+      name: name || (existing ? existing.name : "Staff Device"),
+      deviceType: deviceType || (existing ? existing.deviceType : "Unknown Device"),
+      userAgent: req.headers["user-agent"] || "",
+      firstInstalledAt: existing ? existing.firstInstalledAt : nowIso,
+      lastSeenAt: nowIso,
+      lastHeartbeatMs: Date.now(),
+      ip: (req.headers["x-forwarded-for"] as string) || req.socket.remoteAddress || "",
+      appVersion: appVersion || "3.0.0",
+      pendingFilesCount: existing ? existing.pendingFilesCount : 0,
+      pendingItems: existing ? existing.pendingItems : [],
+    };
+
+    devicesMap.set(deviceId, updated);
+    saveDevicesRegistry();
+    return res.json({ success: true, device: updated });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// 2. Presence Heartbeat Endpoint (Every active device pulses every 8-12 seconds)
+app.post("/api/presence/heartbeat", (req, res) => {
+  try {
+    const {
+      deviceId,
+      adminPhone = "01937200635",
+      role,
+      phone,
+      name,
+      deviceType,
+      appVersion,
+      pendingFilesCount = 0,
+      pendingItems = [],
+    } = req.body;
+
+    if (!deviceId) return res.status(400).json({ success: false, error: "Missing deviceId" });
+
+    const nowIso = new Date().toISOString();
+    const existing = devicesMap.get(deviceId);
+    const updated: DeviceRecord = {
+      deviceId,
+      adminPhone: adminPhone || "01937200635",
+      role: role || (existing ? existing.role : "counter"),
+      phone: phone || (existing ? existing.phone : ""),
+      name: name || (existing ? existing.name : "Staff Device"),
+      deviceType: deviceType || (existing ? existing.deviceType : "Device"),
+      userAgent: req.headers["user-agent"] || (existing ? existing.userAgent : ""),
+      firstInstalledAt: existing ? existing.firstInstalledAt : nowIso,
+      lastSeenAt: nowIso,
+      lastHeartbeatMs: Date.now(),
+      ip: (req.headers["x-forwarded-for"] as string) || req.socket.remoteAddress || "",
+      appVersion: appVersion || (existing ? existing.appVersion : "3.0.0"),
+      pendingFilesCount: typeof pendingFilesCount === "number" ? pendingFilesCount : 0,
+      pendingItems: Array.isArray(pendingItems) ? pendingItems : (existing?.pendingItems || []),
+    };
+
+    devicesMap.set(deviceId, updated);
+    saveDevicesRegistry();
+    return res.json({ success: true, serverTime: Date.now() });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// 3. Presence Status Query (All connected clients poll to see remote device statuses)
+app.get("/api/presence/status", (req, res) => {
+  try {
+    const adminPhone = (req.query.adminPhone as string) || "01937200635";
+    const now = Date.now();
+    const ONLINE_THRESHOLD_MS = 38000; // 38 seconds timeout
+
+    const matchingDevices = Array.from(devicesMap.values()).filter(
+      (d) => d.adminPhone === adminPhone || !d.adminPhone
+    );
+
+    const enriched = matchingDevices.map((d) => {
+      const diffMs = Math.max(0, now - (d.lastHeartbeatMs || 0));
+      const isOnline = diffMs <= ONLINE_THRESHOLD_MS;
+      return {
+        ...d,
+        isOnline,
+        lastSeenSec: Math.floor(diffMs / 1000),
+      };
+    });
+
+    const isDsrOnline = enriched.some((d) => d.role === "dsr" && d.isOnline);
+    const isCounterOnline = enriched.some((d) => d.role === "counter" && d.isOnline);
+    const isAdminOnline = enriched.some((d) => d.role === "admin" && d.isOnline);
+
+    return res.json({
+      success: true,
+      adminPhone,
+      serverTime: now,
+      onlineSummary: {
+        dsrOnline: isDsrOnline,
+        counterOnline: isCounterOnline,
+        adminOnline: isAdminOnline,
+        totalOnline: enriched.filter((d) => d.isOnline).length,
+        totalRegistered: enriched.length,
+      },
+      devices: enriched,
+    });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// 4. Fleet Device List under Admin
+app.get("/api/device/list", (req, res) => {
+  try {
+    const adminPhone = (req.query.adminPhone as string) || "01937200635";
+    const now = Date.now();
+    const ONLINE_THRESHOLD_MS = 38000;
+
+    const list = Array.from(devicesMap.values())
+      .filter((d) => d.adminPhone === adminPhone || !d.adminPhone)
+      .map((d) => ({
+        ...d,
+        isOnline: Math.max(0, now - (d.lastHeartbeatMs || 0)) <= ONLINE_THRESHOLD_MS,
+      }));
+
+    return res.json({ success: true, adminPhone, count: list.length, devices: list });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// 5. Multi-Device Pending Sync Queue: Report pending items from a device
+app.post("/api/device/pending-sync/report", (req, res) => {
+  try {
+    const { deviceId, pendingItems = [] } = req.body;
+    if (!deviceId) return res.status(400).json({ success: false, error: "Missing deviceId" });
+
+    const existing = devicesMap.get(deviceId);
+    if (existing) {
+      existing.pendingItems = Array.isArray(pendingItems) ? pendingItems : [];
+      existing.pendingFilesCount = existing.pendingItems.length;
+      existing.lastHeartbeatMs = Date.now();
+      existing.lastSeenAt = new Date().toISOString();
+      devicesMap.set(deviceId, existing);
+      saveDevicesRegistry();
+    }
+    return res.json({ success: true, count: existing?.pendingFilesCount || 0 });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// 6. Admin inspects all pending items from all devices
+app.get("/api/device/pending-sync/all", (req, res) => {
+  try {
+    const adminPhone = (req.query.adminPhone as string) || "01937200635";
+    const matching = Array.from(devicesMap.values()).filter(
+      (d) => d.adminPhone === adminPhone || !d.adminPhone
+    );
+
+    const devicesWithPending = matching
+      .filter((d) => (d.pendingItems && d.pendingItems.length > 0) || d.pendingFilesCount > 0)
+      .map((d) => ({
+        deviceId: d.deviceId,
+        role: d.role,
+        name: d.name,
+        phone: d.phone,
+        deviceType: d.deviceType,
+        pendingFilesCount: d.pendingFilesCount,
+        pendingItems: d.pendingItems || [],
+        lastSeenAt: d.lastSeenAt,
+      }));
+
+    return res.json({
+      success: true,
+      totalPendingDevices: devicesWithPending.length,
+      totalPendingFiles: devicesWithPending.reduce((sum, d) => sum + d.pendingFilesCount, 0),
+      devices: devicesWithPending,
+    });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// 7. Admin Clears Device Pending Queue & exports to an emergency JSON backup
+app.post("/api/device/pending-sync/clear-to-backup", (req, res) => {
+  try {
+    const { deviceId } = req.body;
+    if (!deviceId) return res.status(400).json({ success: false, error: "Missing deviceId" });
+
+    const device = devicesMap.get(deviceId);
+    if (!device) return res.status(404).json({ success: false, error: "Device not found" });
+
+    const pending = device.pendingItems || [];
+    const timestamp = new Date().toISOString();
+    const backupId = `pending_clear_${deviceId}_${Date.now()}`;
+    const backupFileName = `emergency_backup_${backupId}.json`;
+    const filePath = path.join(BACKUP_DIR, backupFileName);
+
+    const snapshot = {
+      id: backupId,
+      timestamp,
+      sourceDevice: deviceId,
+      deviceRole: device.role,
+      devicePhone: device.phone,
+      deviceName: device.name,
+      clearedBy: "Admin 01937200635",
+      clearedItemCount: pending.length,
+      items: pending,
+    };
+
+    fs.writeFileSync(filePath, JSON.stringify(snapshot, null, 2), "utf-8");
+
+    // Clear queue for this device
+    device.pendingItems = [];
+    device.pendingFilesCount = 0;
+    devicesMap.set(deviceId, device);
+    saveDevicesRegistry();
+
+    return res.json({
+      success: true,
+      message: `পেন্ডিং ${pending.length}টি ফাইল সফলভাবে ক্লিয়ার করে ইমার্জেন্সি ব্যাকআপ ফাইলে সংরক্ষণ করা হয়েছে।`,
+      backupFileName,
+      downloadUrl: `/api/backup/emergency/${backupFileName}`,
+      clearedCount: pending.length,
+    });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// 8. Download Emergency Backup generated from pending queues
+app.get("/api/backup/emergency/:filename", (req, res) => {
+  try {
+    const filename = req.params.filename.replace(/[^a-zA-Z0-9_.-]/g, "");
+    const filePath = path.join(BACKUP_DIR, filename);
+    if (!fs.existsSync(filePath)) {
+      return res.status(404).send("Emergency backup file not found.");
+    }
+    res.setHeader("Content-Type", "application/json; charset=utf-8");
+    res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+    return res.sendFile(filePath);
+  } catch (err: any) {
+    return res.status(500).send("Error reading backup file.");
+  }
+});
+
 
 // Helper function to convert Bengali digits (০-৯) and clean numeric strings to valid float numbers
 function parseBanglaNumber(val: any): number {

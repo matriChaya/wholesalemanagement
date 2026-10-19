@@ -1020,16 +1020,38 @@ export const PaymentCenterModal: React.FC<PaymentCenterModalProps> = ({
               {historyViewType === 'COMPANY' ? (
                 /* Company Payments List */
                 <div className="space-y-2 max-h-72 overflow-y-auto pr-1">
-                  {supplierLedger
-                    .filter((e) => {
+                  {(() => {
+                    const filtered = supplierLedger.filter((e) => {
                       if (e.type !== 'PAYMENT') return false;
                       const dateStr = (e.date || '').toLowerCase();
                       if (historyDateFilter === 'TODAY') return dateStr.includes(getTodayDateString());
                       if (historyDateFilter === 'YESTERDAY') return dateStr.includes(getYesterdayDateString());
                       if (historyDateFilter !== 'ALL' && historyDateFilter !== '') return dateStr.includes(historyDateFilter);
                       return true;
-                    })
-                    .map((item) => {
+                    });
+
+                    if (filtered.length === 0) {
+                      return (
+                        <div className="py-8 text-center bg-slate-950/40 rounded-xl border border-slate-800 space-y-2 p-4">
+                          <p className="text-slate-400 text-xs">
+                            {language === 'bn'
+                              ? 'নির্বাচিত ফিল্টারে কোনো কোম্পানি পেমেন্ট পাওয়া যায়নি।'
+                              : 'No company payments found matching filter.'}
+                          </p>
+                          {supplierLedger.some((e) => e.type === 'PAYMENT') && (
+                            <button
+                              type="button"
+                              onClick={() => setHistoryDateFilter('ALL')}
+                              className="text-xs text-indigo-400 hover:text-indigo-300 font-bold underline"
+                            >
+                              {language === 'bn' ? 'সব তারিখের পেমেন্ট রেকর্ড দেখুন' : 'Show all dates'}
+                            </button>
+                          )}
+                        </div>
+                      );
+                    }
+
+                    return filtered.map((item) => {
                       const suppObj = suppliers.find((s) => s.id === item.supplierId);
                       const displayName = item.supplierName || suppObj?.company || suppObj?.name || 'কোম্পানি';
                       return (
@@ -1073,69 +1095,87 @@ export const PaymentCenterModal: React.FC<PaymentCenterModalProps> = ({
                           </div>
                         </div>
                       );
-                    })}
-                  {supplierLedger.filter((e) => e.type === 'PAYMENT').length === 0 && (
-                    <div className="py-6 text-center text-slate-400 text-xs">
-                      {language === 'bn' ? 'কোনো কোম্পানি পেমেন্ট পাওয়া যায়নি।' : 'No company payments found.'}
-                    </div>
-                  )}
+                    });
+                  })()}
                 </div>
               ) : (
                 /* Staff Cash Handovers List */
                 <div className="space-y-2 max-h-72 overflow-y-auto pr-1">
-                  {cashTransfers
-                    .filter((tr) => {
+                  {(() => {
+                    const filtered = cashTransfers.filter((tr) => {
                       const dateStr = (tr.createdAt || '').toLowerCase();
                       if (historyDateFilter === 'TODAY') return dateStr.includes(getTodayDateString());
                       if (historyDateFilter === 'YESTERDAY') return dateStr.includes(getYesterdayDateString());
                       if (historyDateFilter !== 'ALL' && historyDateFilter !== '') return dateStr.includes(historyDateFilter);
                       return true;
-                    })
-                    .slice(0, 30)
-                    .map((tr) => (
-                    <div
-                      key={tr.id}
-                      className="p-3 rounded-xl bg-slate-800/60 border border-slate-700/80 flex items-center justify-between gap-2 text-xs"
-                    >
-                      <div className="space-y-0.5">
-                        <div className="flex items-center gap-2">
-                          <span className="font-bold text-slate-200">{tr.fromUserName} ➔ {tr.toUserName}</span>
-                          <span
-                            className={`text-[9px] px-1.5 py-0.2 rounded font-bold ${
-                              tr.status === 'ACCEPTED'
-                                ? 'bg-emerald-500/20 text-emerald-300'
-                                : tr.status === 'PENDING'
-                                ? 'bg-amber-500/20 text-amber-300'
-                                : 'bg-rose-500/20 text-rose-300'
-                            }`}
-                          >
-                            {tr.status}
-                          </span>
-                        </div>
-                        <p className="text-[11px] text-slate-400 truncate max-w-xs">{tr.notes}</p>
-                      </div>
+                    });
 
-                      <div className="flex items-center gap-2 shrink-0">
-                        <span className="font-bold text-emerald-400">
-                          {formatCurrency(tr.amount, language)}
-                        </span>
-                        {currentRole === 'admin' && (
-                          <button
-                            type="button"
-                            onClick={() => {
-                              if (window.confirm(language === 'bn' ? 'আপনি কি এই ট্রান্সফার এন্ট্রিটি মুছে ফেলতে চান?' : 'Delete this transfer entry?')) {
-                                deleteCashTransfer(tr.id);
-                              }
-                            }}
-                            className="p-1.5 rounded-lg text-slate-500 hover:text-rose-400 hover:bg-slate-700 transition"
-                            title={t.deleteWrongEntry}
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
-                        )}
+                    if (filtered.length === 0) {
+                      return (
+                        <div className="py-8 text-center bg-slate-950/40 rounded-xl border border-slate-800 space-y-2 p-4">
+                          <p className="text-slate-400 text-xs">
+                            {language === 'bn'
+                              ? 'নির্বাচিত ফিল্টারে কোনো ক্যাশ হ্যান্ডওভার পাওয়া যায়নি।'
+                              : 'No staff handovers found matching filter.'}
+                          </p>
+                          {cashTransfers.length > 0 && (
+                            <button
+                              type="button"
+                              onClick={() => setHistoryDateFilter('ALL')}
+                              className="text-xs text-indigo-400 hover:text-indigo-300 font-bold underline"
+                            >
+                              {language === 'bn' ? 'সব তারিখের হ্যান্ডওভার রেকর্ড দেখুন' : 'Show all dates'}
+                            </button>
+                          )}
+                        </div>
+                      );
+                    }
+
+                    return filtered.slice(0, 45).map((tr) => (
+                      <div
+                        key={tr.id}
+                        className="p-3 rounded-xl bg-slate-800/60 border border-slate-700/80 flex items-center justify-between gap-2 text-xs"
+                      >
+                        <div className="space-y-0.5">
+                          <div className="flex items-center gap-2">
+                            <span className="font-bold text-slate-200">{tr.fromUserName} ➔ {tr.toUserName}</span>
+                            <span
+                              className={`text-[9px] px-1.5 py-0.2 rounded font-bold ${
+                                tr.status === 'ACCEPTED'
+                                  ? 'bg-emerald-500/20 text-emerald-300'
+                                  : tr.status === 'PENDING'
+                                  ? 'bg-amber-500/20 text-amber-300'
+                                  : 'bg-rose-500/20 text-rose-300'
+                              }`}
+                            >
+                              {tr.status}
+                            </span>
+                          </div>
+                          <p className="text-[11px] text-slate-400 truncate max-w-xs">{tr.notes}</p>
+                        </div>
+
+                        <div className="flex items-center gap-2 shrink-0">
+                          <span className="font-bold text-emerald-400">
+                            {formatCurrency(tr.amount, language)}
+                          </span>
+                          {currentRole === 'admin' && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                if (window.confirm(language === 'bn' ? 'আপনি কি এই ট্রান্সফার এন্ট্রিটি মুছে ফেলতে চান?' : 'Delete this transfer entry?')) {
+                                  deleteCashTransfer(tr.id);
+                                }
+                              }}
+                              className="p-1.5 rounded-lg text-slate-500 hover:text-rose-400 hover:bg-slate-700 transition"
+                              title={t.deleteWrongEntry}
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          )}
+                        </div>
                       </div>
-                    </div>
-                  ))}
+                    ));
+                  })()}
                 </div>
               )}
             </div>
